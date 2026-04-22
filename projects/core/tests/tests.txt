@@ -1,0 +1,919 @@
+Running all 19 tests
+
+
+TEST INDEX: 0
+
+--------------------------------------
+TEST: #0. global flag simple
+Args Inputs :  [ '-g', 'test' ]
+--------------------------------------
+-> Async run execution
+GLOBALS
+{
+  console: { mode: 'normal', colors: true, output: 'pretty' },
+  logging: { enabled: false, level: 'info', colors: true, path: '' },
+  daemon: { enabled: false, pidFile: '.pid', envState: false },
+  customGlobalGroup1: { testGlobal1: 'global' }
+}
+MODULES
+{
+  moduleName: 'test',
+  moduleOptions: {},
+  actionName: '__defaultAction__',
+  actionOptions: {},
+  args: []
+}
+PARSER
+{
+  context: {
+    globals: { customGlobalGroup1: [Object] },
+    module: 'test',
+    action: '__defaultAction__',
+    actionOptions: {},
+    args: []
+  },
+  ignored: [],
+  issues: []
+}
+ISSUES
+[]
+
+TEST INDEX: 1
+
+--------------------------------------
+TEST: #1. global flag unknown
+Args Inputs :  [ '--unknown', 'test' ]
+--------------------------------------
+-> Async run execution
+GLOBALS
+{
+  console: { mode: 'normal', colors: true, output: 'pretty' },
+  logging: { enabled: false, level: 'info', colors: true, path: '' },
+  daemon: { enabled: false, pidFile: '.pid', envState: false },
+  customGlobalGroup1: { testGlobal1: '' }
+}
+MODULES
+{
+  moduleName: 'test',
+  moduleOptions: {},
+  actionName: '__defaultAction__',
+  actionOptions: {},
+  args: []
+}
+PARSER
+{
+  context: {
+    globals: {},
+    module: 'test',
+    action: '__defaultAction__',
+    actionOptions: {},
+    args: []
+  },
+  ignored: [],
+  issues: [
+    {
+      code: 'UNKNOWN_FLAG',
+      message: 'Unknown flag "--unknown" in current scope',
+      token: '--unknown'
+    }
+  ]
+}
+ISSUES
+[
+  {
+    code: 'UNKNOWN_FLAG',
+    message: 'Unknown flag "--unknown" in current scope',
+    token: '--unknown'
+  }
+]
+
+TEST INDEX: 2
+
+--------------------------------------
+TEST: #2. default action simple
+Args Inputs :  [ 'test' ]
+--------------------------------------
+-> Async run execution
+GLOBALS
+{
+  console: { mode: 'normal', colors: true, output: 'pretty' },
+  logging: { enabled: false, level: 'info', colors: true, path: '' },
+  daemon: { enabled: false, pidFile: '.pid', envState: false },
+  customGlobalGroup1: { testGlobal1: '' }
+}
+MODULES
+{
+  moduleName: 'test',
+  moduleOptions: {},
+  actionName: '__defaultAction__',
+  actionOptions: {},
+  args: []
+}
+PARSER
+{
+  context: {
+    globals: {},
+    module: 'test',
+    action: '__defaultAction__',
+    actionOptions: {},
+    args: []
+  },
+  ignored: [],
+  issues: []
+}
+ISSUES
+[]
+
+TEST INDEX: 3
+
+--------------------------------------
+TEST: #3. default action flag
+Args Inputs :  [ 'test', '--add=value' ]
+--------------------------------------
+-> Async run execution
+GLOBALS
+{
+  console: { mode: 'normal', colors: true, output: 'pretty' },
+  logging: { enabled: false, level: 'info', colors: true, path: '' },
+  daemon: { enabled: false, pidFile: '.pid', envState: false },
+  customGlobalGroup1: { testGlobal1: '' }
+}
+MODULES
+{
+  moduleName: 'test',
+  moduleOptions: {},
+  actionName: '__defaultAction__',
+  actionOptions: { add: 'value' },
+  args: []
+}
+PARSER
+{
+  context: {
+    globals: {},
+    module: 'test',
+    action: '__defaultAction__',
+    actionOptions: { add: 'value' },
+    args: []
+  },
+  ignored: [],
+  issues: []
+}
+ISSUES
+[]
+
+TEST INDEX: 4
+
+--------------------------------------
+TEST: #4. default action short flag
+Args Inputs :  [ 'test', '-a=value' ]
+--------------------------------------
+-> Async run execution
+GLOBALS
+{
+  console: { mode: 'normal', colors: true, output: 'pretty' },
+  logging: { enabled: false, level: 'info', colors: true, path: '' },
+  daemon: { enabled: false, pidFile: '.pid', envState: false },
+  customGlobalGroup1: { testGlobal1: '' }
+}
+MODULES
+{
+  moduleName: 'test',
+  moduleOptions: {},
+  actionName: '__defaultAction__',
+  actionOptions: { add: 'value' },
+  args: []
+}
+PARSER
+{
+  context: {
+    globals: {},
+    module: 'test',
+    action: '__defaultAction__',
+    actionOptions: { add: 'value' },
+    args: []
+  },
+  ignored: [],
+  issues: []
+}
+ISSUES
+[]
+
+TEST INDEX: 5
+
+--------------------------------------
+TEST: #5. module + action
+Args Inputs :  [ 'test2', 'testAction' ]
+--------------------------------------
+-> Async run execution
+GLOBALS
+{
+  console: { mode: 'normal', colors: true, output: 'pretty' },
+  logging: { enabled: false, level: 'info', colors: true, path: '' },
+  daemon: { enabled: false, pidFile: '.pid', envState: false },
+  customGlobalGroup1: { testGlobal1: '' }
+}
+MODULES
+{
+  moduleName: 'test2',
+  moduleOptions: {},
+  actionName: 'testAction',
+  actionOptions: {},
+  args: []
+}
+PARSER
+{
+  context: {
+    globals: {},
+    module: 'test2',
+    moduleOptions: {},
+    action: 'testAction',
+    actionOptions: {},
+    args: []
+  },
+  ignored: [],
+  issues: []
+}
+ISSUES
+[]
+
+TEST INDEX: 6
+
+--------------------------------------
+TEST: #6. module flag
+Args Inputs :  [ 'test2', '--moduleFlag', 'testAction' ]
+--------------------------------------
+-> Async run execution
+GLOBALS
+{
+  console: { mode: 'normal', colors: true, output: 'pretty' },
+  logging: { enabled: false, level: 'info', colors: true, path: '' },
+  daemon: { enabled: false, pidFile: '.pid', envState: false },
+  customGlobalGroup1: { testGlobal1: '' }
+}
+MODULES
+{
+  moduleName: 'test2',
+  moduleOptions: { moduleFlag: 'moduleFlag' },
+  actionName: 'testAction',
+  actionOptions: {},
+  args: []
+}
+PARSER
+{
+  context: {
+    globals: {},
+    module: 'test2',
+    moduleOptions: { moduleFlag: 'moduleFlag' },
+    action: 'testAction',
+    actionOptions: {},
+    args: []
+  },
+  ignored: [],
+  issues: []
+}
+ISSUES
+[]
+
+TEST INDEX: 7
+
+--------------------------------------
+TEST: #7. action flag
+Args Inputs :  [ 'test2', 'testAction', '--add=value' ]
+--------------------------------------
+-> Async run execution
+GLOBALS
+{
+  console: { mode: 'normal', colors: true, output: 'pretty' },
+  logging: { enabled: false, level: 'info', colors: true, path: '' },
+  daemon: { enabled: false, pidFile: '.pid', envState: false },
+  customGlobalGroup1: { testGlobal1: '' }
+}
+MODULES
+{
+  moduleName: 'test2',
+  moduleOptions: {},
+  actionName: 'testAction',
+  actionOptions: { add: 'value' },
+  args: []
+}
+PARSER
+{
+  context: {
+    globals: {},
+    module: 'test2',
+    moduleOptions: {},
+    action: 'testAction',
+    actionOptions: { add: 'value' },
+    args: []
+  },
+  ignored: [],
+  issues: []
+}
+ISSUES
+[]
+
+TEST INDEX: 8
+
+--------------------------------------
+TEST: #8. args after action
+Args Inputs :  [ 'test2', 'testAction', 'arg1', 'arg2' ]
+--------------------------------------
+-> Async run execution
+GLOBALS
+{
+  console: { mode: 'normal', colors: true, output: 'pretty' },
+  logging: { enabled: false, level: 'info', colors: true, path: '' },
+  daemon: { enabled: false, pidFile: '.pid', envState: false },
+  customGlobalGroup1: { testGlobal1: '' }
+}
+MODULES
+{
+  moduleName: 'test2',
+  moduleOptions: {},
+  actionName: 'testAction',
+  actionOptions: {},
+  args: [ 'arg1', 'arg2' ]
+}
+PARSER
+{
+  context: {
+    globals: {},
+    module: 'test2',
+    moduleOptions: {},
+    action: 'testAction',
+    actionOptions: {},
+    args: [ 'arg1', 'arg2' ]
+  },
+  ignored: [],
+  issues: []
+}
+ISSUES
+[]
+
+TEST INDEX: 9
+
+--------------------------------------
+TEST: #9. args after default action
+Args Inputs :  [ 'test', 'arg1', 'arg2' ]
+--------------------------------------
+-> Async run execution
+GLOBALS
+{
+  console: { mode: 'normal', colors: true, output: 'pretty' },
+  logging: { enabled: false, level: 'info', colors: true, path: '' },
+  daemon: { enabled: false, pidFile: '.pid', envState: false },
+  customGlobalGroup1: { testGlobal1: '' }
+}
+MODULES
+{
+  moduleName: 'test',
+  moduleOptions: {},
+  actionName: '__defaultAction__',
+  actionOptions: {},
+  args: [ 'arg1', 'arg2' ]
+}
+PARSER
+{
+  context: {
+    globals: {},
+    module: 'test',
+    action: '__defaultAction__',
+    actionOptions: {},
+    args: [ 'arg1', 'arg2' ]
+  },
+  ignored: [],
+  issues: []
+}
+ISSUES
+[]
+
+TEST INDEX: 10
+
+--------------------------------------
+TEST: #10. stop token
+Args Inputs :  [ 'test2', 'testAction', '--', '-a', '-b', '--c' ]
+--------------------------------------
+-> Async run execution
+GLOBALS
+{
+  console: { mode: 'normal', colors: true, output: 'pretty' },
+  logging: { enabled: false, level: 'info', colors: true, path: '' },
+  daemon: { enabled: false, pidFile: '.pid', envState: false },
+  customGlobalGroup1: { testGlobal1: '' }
+}
+MODULES
+{
+  moduleName: 'test2',
+  moduleOptions: {},
+  actionName: 'testAction',
+  actionOptions: {},
+  args: [ '-a', '-b', '--c' ]
+}
+PARSER
+{
+  context: {
+    globals: {},
+    module: 'test2',
+    moduleOptions: {},
+    action: 'testAction',
+    actionOptions: {},
+    args: [ '-a', '-b', '--c' ]
+  },
+  ignored: [],
+  issues: []
+}
+ISSUES
+[]
+
+TEST INDEX: 11
+
+--------------------------------------
+TEST: #11. short group
+Args Inputs :  [ 'test2', 'testAction', '-aaa' ]
+--------------------------------------
+-> Async run execution
+GLOBALS
+{
+  console: { mode: 'normal', colors: true, output: 'pretty' },
+  logging: { enabled: false, level: 'info', colors: true, path: '' },
+  daemon: { enabled: false, pidFile: '.pid', envState: false },
+  customGlobalGroup1: { testGlobal1: '' }
+}
+MODULES
+{
+  moduleName: 'test2',
+  moduleOptions: {},
+  actionName: 'testAction',
+  actionOptions: {},
+  args: []
+}
+PARSER
+{
+  context: {
+    globals: {},
+    module: 'test2',
+    moduleOptions: {},
+    action: 'testAction',
+    actionOptions: {},
+    args: []
+  },
+  ignored: [],
+  issues: [
+    {
+      code: 'INVALID_SHORT_GROUP',
+      message: 'Flag "-a" requires a value and cannot appear before the end of a short group',
+      token: '-aaa'
+    },
+    {
+      code: 'INVALID_SHORT_GROUP',
+      message: 'Flag "-a" requires a value and cannot appear before the end of a short group',
+      token: '-aaa'
+    },
+    {
+      code: 'MISSING_FLAG_VALUE',
+      message: 'Flag "-a" requires a value',
+      token: '-aaa'
+    }
+  ]
+}
+ISSUES
+[
+  {
+    code: 'INVALID_SHORT_GROUP',
+    message: 'Flag "-a" requires a value and cannot appear before the end of a short group',
+    token: '-aaa'
+  },
+  {
+    code: 'INVALID_SHORT_GROUP',
+    message: 'Flag "-a" requires a value and cannot appear before the end of a short group',
+    token: '-aaa'
+  },
+  {
+    code: 'MISSING_FLAG_VALUE',
+    message: 'Flag "-a" requires a value',
+    token: '-aaa'
+  }
+]
+
+TEST INDEX: 12
+
+--------------------------------------
+TEST: #12. short group with value
+Args Inputs :  [ 'test2', 'testAction', '-aa a=value' ]
+--------------------------------------
+-> Async run execution
+GLOBALS
+{
+  console: { mode: 'normal', colors: true, output: 'pretty' },
+  logging: { enabled: false, level: 'info', colors: true, path: '' },
+  daemon: { enabled: false, pidFile: '.pid', envState: false },
+  customGlobalGroup1: { testGlobal1: '' }
+}
+MODULES
+{
+  moduleName: 'test2',
+  moduleOptions: {},
+  actionName: 'testAction',
+  actionOptions: { add: 'value' },
+  args: []
+}
+PARSER
+{
+  context: {
+    globals: {},
+    module: 'test2',
+    moduleOptions: {},
+    action: 'testAction',
+    actionOptions: { add: 'value' },
+    args: []
+  },
+  ignored: [],
+  issues: [
+    {
+      code: 'INVALID_SHORT_GROUP',
+      message: 'Flag "-a" requires a value and cannot appear before the end of a short group',
+      token: '-aa a=value'
+    },
+    {
+      code: 'INVALID_SHORT_GROUP',
+      message: 'Flag "-a" requires a value and cannot appear before the end of a short group',
+      token: '-aa a=value'
+    },
+    {
+      code: 'UNKNOWN_FLAG',
+      message: 'Unknown flag "- " in current scope',
+      token: '-aa a=value'
+    }
+  ]
+}
+ISSUES
+[
+  {
+    code: 'INVALID_SHORT_GROUP',
+    message: 'Flag "-a" requires a value and cannot appear before the end of a short group',
+    token: '-aa a=value'
+  },
+  {
+    code: 'INVALID_SHORT_GROUP',
+    message: 'Flag "-a" requires a value and cannot appear before the end of a short group',
+    token: '-aa a=value'
+  },
+  {
+    code: 'UNKNOWN_FLAG',
+    message: 'Unknown flag "- " in current scope',
+    token: '-aa a=value'
+  }
+]
+
+TEST INDEX: 13
+
+--------------------------------------
+TEST: #13. unknown module
+Args Inputs :  [ 'unknown', 'action', 'arg1', 'arg2' ]
+--------------------------------------
+-> Async run execution
+GLOBALS
+{
+  console: { mode: 'normal', colors: true, output: 'pretty' },
+  logging: { enabled: false, level: 'info', colors: true, path: '' },
+  daemon: { enabled: false, pidFile: '.pid', envState: false },
+  customGlobalGroup1: { testGlobal1: '' }
+}
+MODULES
+{
+  moduleName: 'unknown',
+  moduleOptions: {},
+  actionName: '',
+  actionOptions: {},
+  args: [ 'action', 'arg1', 'arg2' ]
+}
+PARSER
+{
+  context: {
+    globals: {},
+    module: 'unknown',
+    args: [ 'action', 'arg1', 'arg2' ]
+  },
+  ignored: [],
+  issues: [
+    {
+      code: 'MODULE_MISSING',
+      message: 'Unknown module "unknown"',
+      token: 'unknown'
+    }
+  ]
+}
+ISSUES
+[
+  {
+    code: 'MODULE_MISSING',
+    message: 'Unknown module "unknown"',
+    token: 'unknown'
+  }
+]
+
+TEST INDEX: 14
+
+--------------------------------------
+TEST: #14. unknown action
+Args Inputs :  [ 'test2', 'unknown' ]
+--------------------------------------
+-> Async run execution
+GLOBALS
+{
+  console: { mode: 'normal', colors: true, output: 'pretty' },
+  logging: { enabled: false, level: 'info', colors: true, path: '' },
+  daemon: { enabled: false, pidFile: '.pid', envState: false },
+  customGlobalGroup1: { testGlobal1: '' }
+}
+MODULES
+{
+  moduleName: 'test2',
+  moduleOptions: {},
+  actionName: 'unknown',
+  actionOptions: {},
+  args: []
+}
+PARSER
+{
+  context: {
+    globals: {},
+    module: 'test2',
+    moduleOptions: {},
+    action: 'unknown',
+    actionOptions: {},
+    args: []
+  },
+  ignored: [],
+  issues: [
+    {
+      code: 'ACTION_MISSING',
+      message: 'Unknown action "unknown"',
+      token: 'unknown'
+    }
+  ]
+}
+ISSUES
+[
+  {
+    code: 'ACTION_MISSING',
+    message: 'Unknown action "unknown"',
+    token: 'unknown'
+  }
+]
+
+TEST INDEX: 15
+
+--------------------------------------
+TEST: #15. missing flag value
+Args Inputs :  [ 'test2', 'testAction', '-a' ]
+--------------------------------------
+-> Async run execution
+GLOBALS
+{
+  console: { mode: 'normal', colors: true, output: 'pretty' },
+  logging: { enabled: false, level: 'info', colors: true, path: '' },
+  daemon: { enabled: false, pidFile: '.pid', envState: false },
+  customGlobalGroup1: { testGlobal1: '' }
+}
+MODULES
+{
+  moduleName: 'test2',
+  moduleOptions: {},
+  actionName: 'testAction',
+  actionOptions: {},
+  args: []
+}
+PARSER
+{
+  context: {
+    globals: {},
+    module: 'test2',
+    moduleOptions: {},
+    action: 'testAction',
+    actionOptions: {},
+    args: []
+  },
+  ignored: [],
+  issues: [
+    {
+      code: 'MISSING_FLAG_VALUE',
+      message: 'Flag "-a" requires a value',
+      token: '-a'
+    }
+  ]
+}
+ISSUES
+[
+  {
+    code: 'MISSING_FLAG_VALUE',
+    message: 'Flag "-a" requires a value',
+    token: '-a'
+  }
+]
+
+TEST INDEX: 16
+
+--------------------------------------
+TEST: #16. unexpected flag value
+Args Inputs :  [ 'test2', 'testAction', '--moduleFlag=value' ]
+--------------------------------------
+-> Async run execution
+GLOBALS
+{
+  console: { mode: 'normal', colors: true, output: 'pretty' },
+  logging: { enabled: false, level: 'info', colors: true, path: '' },
+  daemon: { enabled: false, pidFile: '.pid', envState: false },
+  customGlobalGroup1: { testGlobal1: '' }
+}
+MODULES
+{
+  moduleName: 'test2',
+  moduleOptions: {},
+  actionName: 'testAction',
+  actionOptions: {},
+  args: []
+}
+PARSER
+{
+  context: {
+    globals: {},
+    module: 'test2',
+    moduleOptions: {},
+    action: 'testAction',
+    actionOptions: {},
+    args: []
+  },
+  ignored: [],
+  issues: [
+    {
+      code: 'UNKNOWN_FLAG',
+      message: 'Unknown flag "--moduleFlag" in current scope',
+      token: '--moduleFlag=value'
+    }
+  ]
+}
+ISSUES
+[
+  {
+    code: 'UNKNOWN_FLAG',
+    message: 'Unknown flag "--moduleFlag" in current scope',
+    token: '--moduleFlag=value'
+  }
+]
+
+TEST INDEX: 17
+
+--------------------------------------
+TEST: #17. duplicate flag
+Args Inputs :  [ 'test2', 'testAction', '--add=test', '-a=test' ]
+--------------------------------------
+-> Async run execution
+GLOBALS
+{
+  console: { mode: 'normal', colors: true, output: 'pretty' },
+  logging: { enabled: false, level: 'info', colors: true, path: '' },
+  daemon: { enabled: false, pidFile: '.pid', envState: false },
+  customGlobalGroup1: { testGlobal1: '' }
+}
+MODULES
+{
+  moduleName: 'test2',
+  moduleOptions: {},
+  actionName: 'testAction',
+  actionOptions: { add: 'test' },
+  args: []
+}
+PARSER
+{
+  context: {
+    globals: {},
+    module: 'test2',
+    moduleOptions: {},
+    action: 'testAction',
+    actionOptions: { add: 'test' },
+    args: []
+  },
+  ignored: [],
+  issues: [
+    {
+      code: 'DUPLICATE_FLAG_IN_SCOPE',
+      message: 'Duplicate flag for option "add" in current scope',
+      token: '-a=test'
+    }
+  ]
+}
+ISSUES
+[
+  {
+    code: 'DUPLICATE_FLAG_IN_SCOPE',
+    message: 'Duplicate flag for option "add" in current scope',
+    token: '-a=test'
+  }
+]
+
+TEST INDEX: 18
+
+--------------------------------------
+TEST: #18. chaos parsing
+Args Inputs :  [
+  '-Lm=quiet',    '--unknown',
+  'test2',        '-u',
+  '--moduleFlag', 'testAction',
+  '--add=test',   '-bla',
+  'bla',          'bla'
+]
+--------------------------------------
+-> Async run execution
+GLOBALS
+{
+  console: { mode: 'quiet', colors: false, output: 'pretty' },
+  logging: { enabled: false, level: 'info', colors: true, path: false },
+  daemon: { enabled: false, pidFile: '.pid', envState: false },
+  customGlobalGroup1: { testGlobal1: '' }
+}
+MODULES
+{
+  moduleName: 'test2',
+  moduleOptions: { moduleFlag: 'moduleFlag' },
+  actionName: 'testAction',
+  actionOptions: { add: 'test' },
+  args: [ 'bla', 'bla' ]
+}
+PARSER
+{
+  context: {
+    globals: { logging: [Object], console: [Object] },
+    module: 'test2',
+    moduleOptions: { moduleFlag: 'moduleFlag' },
+    action: 'testAction',
+    actionOptions: { add: 'test' },
+    args: [ 'bla', 'bla' ]
+  },
+  ignored: [],
+  issues: [
+    {
+      code: 'UNKNOWN_FLAG',
+      message: 'Unknown flag "--unknown" in current scope',
+      token: '--unknown'
+    },
+    {
+      code: 'UNKNOWN_FLAG',
+      message: 'Unknown flag "-u" in current scope',
+      token: '-u'
+    },
+    {
+      code: 'UNKNOWN_FLAG',
+      message: 'Unknown flag "-b" in current scope',
+      token: '-bla'
+    },
+    {
+      code: 'UNKNOWN_FLAG',
+      message: 'Unknown flag "-l" in current scope',
+      token: '-bla'
+    },
+    {
+      code: 'MISSING_FLAG_VALUE',
+      message: 'Flag "-a" requires a value',
+      token: '-bla'
+    },
+    {
+      code: 'DUPLICATE_FLAG_IN_SCOPE',
+      message: 'Duplicate flag for option "add" in current scope',
+      token: '-bla'
+    }
+  ]
+}
+ISSUES
+[
+  {
+    code: 'UNKNOWN_FLAG',
+    message: 'Unknown flag "--unknown" in current scope',
+    token: '--unknown'
+  },
+  {
+    code: 'UNKNOWN_FLAG',
+    message: 'Unknown flag "-u" in current scope',
+    token: '-u'
+  },
+  {
+    code: 'UNKNOWN_FLAG',
+    message: 'Unknown flag "-b" in current scope',
+    token: '-bla'
+  },
+  {
+    code: 'UNKNOWN_FLAG',
+    message: 'Unknown flag "-l" in current scope',
+    token: '-bla'
+  },
+  {
+    code: 'MISSING_FLAG_VALUE',
+    message: 'Flag "-a" requires a value',
+    token: '-bla'
+  },
+  {
+    code: 'DUPLICATE_FLAG_IN_SCOPE',
+    message: 'Duplicate flag for option "add" in current scope',
+    token: '-bla'
+  }
+]

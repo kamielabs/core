@@ -1,0 +1,39 @@
+{
+	"name": "@kamie-oss/core",
+	"version": "0.1.0",
+	"type": "module",
+	"main": "./dist/index.js",
+	"private": true,
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		},
+		"./dev": {
+			"import": "./dist/dev/index.js"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"types": "./dist/index.d.ts",
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"lint": "eslint",
+		"lint:fix": "eslint --fix",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run",
+		"check": "pnpm typecheck && pnpm lint && pnpm test"
+	},
+	"devDependencies": {
+		"@types/node": "^24.12.2",
+		"tsup": "^8.5.1",
+		"tsx": "^4.21.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.4"
+	},
+	"dependencies": {
+		"ulid": "3.0.2"
+	}
+}

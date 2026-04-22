@@ -1,0 +1,20 @@
+{
+	"name": "kamielabs-core-workspace",
+	"private": true,
+	"description": "Root PNPM Workspace for kamielabs/core",
+	"scripts": {
+		"check": "pnpm -r check",
+		"build": "pnpm -r build",
+		"check:core": "pnpm --filter @kamie-oss/core check",
+		"build:core": "pnpm --filter @kamie-oss/core build"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "GPL-3.0",
+	"packageManager": "pnpm@10.21.0",
+	"devDependencies": {
+		"@eslint/js": "^10.0.1",
+		"eslint": "^10.2.0",
+		"typescript-eslint": "^8.58.1"
+	}
+}
