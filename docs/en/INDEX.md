@@ -56,23 +56,23 @@ main()
 
 ## 📦 Examples
 
-- [EXAMPLES](./examples/EXAMPLES)
+- [EXAMPLES](./examples/EXAMPLES.md)
 
 ---
 
 ## 🧱 Core Rules
 
-- [AI_USAGE](./AI_USAGE)
+- [AI_USAGE](./AI_USAGE.md)
 - [DEPENDENCIES](./DEPENDENCIES.md)
-- [DESIGN_PRINCIPLES](./DESIGN_PRINCIPLES)
-- [DOCS_POLICY](./DOCS_POLICY)
+- [DESIGN_PRINCIPLES](./design/DESIGN_PRINCIPLES.md)
+- [DOCS_POLICY](./DOCS_POLICY.md)
 
 ---
 
 ## 🏗️ Core Architecture
 
-- [LIFECYCLE](./arch/LIFECYCLE)
-- [ENGINES](./arch/ENGINES)
+- [LIFECYCLE](./arch/LIFECYCLE.md)
+- [ENGINES](./arch/ENGINES.md)
 - [HOOKING] -> TODO
 - [CORE_STATES] -> TODO
 
@@ -108,25 +108,25 @@ A manager is a fundamental core building block responsible for declaring, resolv
 
 #### Services
 
-- [Dev API](./arch/components/ApiService) — Centralized development interface
-- [Snapshot API](./arch/components/SnapshotService) — Centralized interface for core declarations
-- [Tools API](./arch/components/ToolsService) — Interface for tools exposed to the developer
-- [Core Console](./arch/components/CoreConsoleService) — Internal core console
+- [Dev API](./arch/components/ApiService.md) — Centralized development interface
+- [Snapshot API](./arch/components/SnapshotService.md) — Centralized interface for core declarations
+- [Tools API](./arch/components/ToolsService.md) — Interface for tools exposed to the developer
+- [Core Console](./arch/components/CoreConsoleService.md) — Internal core console
 
 #### 🔷 Special Service: Runtime
 
-- [Runtime API](./arch/components/RuntimeService) — Interface of the constructed runtime & runtime orchestrator ensuring consistency
+- [Runtime API](./arch/components/RuntimeService.md) — Interface of the constructed runtime & runtime orchestrator ensuring consistency
 
 #### Managers
 
-- [Events](./arch/components/EventsManager) — Core event system
-- [I18N](./arch/components/I18nManager) — Internationalization system
-- [Meta](./arch/components/MetaManager) — Management of non-translatable data
-- [Bootstrap](./arch/components/BootstrapManager) — Execution environment management
-- [Stages](./arch/components/StagesManager) — Execution profiles management
-- [Parser](./arch/components/ParserManager) — CLI parsing management
-- [Globals](./arch/components/GlobalsManager) — Global options management
-- [Modules](./arch/components/ModulesManager) — Module/action system management
+- [Events](./arch/components/EventsManager.md) — Core event system
+- [I18N](./arch/components/I18nManager.md) — Internationalization system
+- [Meta](./arch/components/MetaManager.md) — Management of non-translatable data
+- [Bootstrap](./arch/components/BootstrapManager.md) — Execution environment management
+- [Stages](./arch/components/StagesManager.md) — Execution profiles management
+- [Parser](./arch/components/ParserManager.md) — CLI parsing management
+- [Globals](./arch/components/GlobalsManager.md) — Global options management
+- [Modules](./arch/components/ModulesManager.md) — Module/action system management
 
 ---
 
