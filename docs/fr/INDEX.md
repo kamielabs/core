@@ -9,7 +9,7 @@ Ce document fournit un point d’entrée structuré vers l’ensemble de la docu
 - Ce projet est un projet sous workspace pnpm
 
 - Installation
-  - pnpm
+  - npm
 
   ```bash
   # Coming soon
@@ -56,23 +56,23 @@ main()
 
 ## 📦 Exemples
 
-- [EXAMPLES](./examples/EXAMPLES)
+- [EXAMPLES](./examples/EXAMPLES.md)
 
 ---
 
 ## 🧱 Règles du Core
 
-- [AI_USAGE](./AI_USAGE)
+- [AI_USAGE](./AI_USAGE.md)
 - [DEPENDENCIES](./DEPENDENCIES.md)
-- [DESIGN_PRINCIPLES](./DESIGN_PRINCIPLES)
-- [DOCS_POLICY](./DOCS_POLICY)
+- [DESIGN_PRINCIPLES](./design/DESIGN_PRINCIPLES.md)
+- [DOCS_POLICY](./DOCS_POLICY.md)
 
 ---
 
 ## 🏗️ Architecture du Core
 
-- [LIFECYCLE](./arch/LIFECYCLE)
-- [ENGINES](./arch/ENGINES)
+- [LIFECYCLE](./arch/LIFECYCLE.md)
+- [ENGINES](./arch/ENGINES.md)
 - [HOOKING] -> TODO
 - [CORE_STATES] -> TODO
 
@@ -108,25 +108,25 @@ Un manager est une brique fondamentale du core responsable de la déclaration, d
 
 #### Services
 
-- [Dev API](./arch/components/ApiService) — Interface centralisée pour le développement
-- [Snapshot API](./arch/components/SnapshotService) — Interface centralisée des déclarations du core
-- [Tools API](./arch/components/ToolsService) — Interface des outils exposés au développeur
-- [Core Console](./arch/components/CoreConsoleService) — Console interne du core
+- [Dev API](./arch/components/ApiService.md) — Interface centralisée pour le développement
+- [Snapshot API](./arch/components/SnapshotService.md) — Interface centralisée des déclarations du core
+- [Tools API](./arch/components/ToolsService.md) — Interface des outils exposés au développeur
+- [Core Console](./arch/components/CoreConsoleService.md) — Console interne du core
 
 #### 🔷 Service spécial : Runtime
 
-- [Runtime API](./arch/components/RuntimeService) — Interface du runtime construit & Orchestrateur du runtime et garant de sa cohérence
+- [Runtime API](./arch/components/RuntimeService.md) — Interface du runtime construit & Orchestrateur du runtime et garant de sa cohérence
 
 #### Managers
 
-- [Events](./arch/components/EventsManager) — Système d’événements du core
-- [I18N](./arch/components/I18nManager) — Système d’internationalisation
-- [Meta](./arch/components/MetaManager) — Gestion des données non traduisibles
-- [Bootstrap](./arch/components/BootstrapManager) — Gestion de l’environnement d’exécution
-- [Stages](./arch/components/StagesManager) — Gestion des profils d’exécution
-- [Parser](./arch/components/ParserManager) — Gestion du parsing CLI
-- [Globals](./arch/components/GlobalsManager) — Gestion des options globales
-- [Modules](./arch/components/ModulesManager) — Gestion du système module/action
+- [Events](./arch/components/EventsManager.md) — Système d’événements du core
+- [I18N](./arch/components/I18nManager.md) — Système d’internationalisation
+- [Meta](./arch/components/MetaManager.md) — Gestion des données non traduisibles
+- [Bootstrap](./arch/components/BootstrapManager.md) — Gestion de l’environnement d’exécution
+- [Stages](./arch/components/StagesManager.md) — Gestion des profils d’exécution
+- [Parser](./arch/components/ParserManager.md) — Gestion du parsing CLI
+- [Globals](./arch/components/GlobalsManager.md) — Gestion des options globales
+- [Modules](./arch/components/ModulesManager.md) — Gestion du système module/action
 
 ---
 
