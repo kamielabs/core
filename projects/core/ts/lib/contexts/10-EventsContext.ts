@@ -18,11 +18,11 @@ import {
 import { EventsManager } from "@managers"
 
 /**
- * EmitSignalHookMethod
+ * SignalTraceHookMethod
  *
- * Type alias for EventsManager.emitSignal.
+ * Type alias for EventsManager.signalTrace.
  *
- * Exposed to hooks to emit low-level signals.
+ * Exposed to hooks to emit "trace" level low-level signals.
  *
  * @template TEvents
  * @template TStages
@@ -30,21 +30,21 @@ import { EventsManager } from "@managers"
  * @template TModules
  * @template TTranslations
  */
-export type EmitSignalHookMethod<
+export type SignalTraceHookMethod<
 	TEvents extends CoreEventsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape
 > =
-	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['emitSignal'];
+	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['signalTrace'];
 
 /**
- * EmitMessageHookMethod
+ * SignalDebugHookMethod
  *
- * Type alias for EventsManager.emitMessage.
+ * Type alias for EventsManager.signalDebug.
  *
- * Exposed to hooks to emit user-facing messages.
+ * Exposed to hooks to emit "debug" level low-level signals
  *
  * @template TEvents
  * @template TStages
@@ -52,25 +52,201 @@ export type EmitSignalHookMethod<
  * @template TModules
  * @template TTranslations
  */
-export type EmitMessageHookMethod<
+export type SignalDebugHookMethod<
 	TEvents extends CoreEventsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape
 > =
-	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['emitMessage'];
+	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['signalDebug'];
 
+/**
+ * SignalInfoHookMethod
+ *
+ * Type alias for EventsManager.signalInfo.
+ *
+ * Exposed to hooks to emit "info" level low-level signals.
+ *
+ * @template TEvents
+ * @template TStages
+ * @template TGlobals
+ * @template TModules
+ * @template TTranslations
+ */
+export type SignalInfoHookMethod<
+	TEvents extends CoreEventsShape,
+	TStages extends CoreStagesShape,
+	TGlobals extends CoreGlobalsShape,
+	TModules extends CoreModulesShape,
+	TTranslations extends CoreTranslationsShape
+> =
+	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['signalInfo'];
+
+/**
+ * SignalWarnHookMethod
+ *
+ * Type alias for EventsManager.signalWarn.
+ *
+ * Exposed to hooks to emit "warning" level low-level signals.
+ *
+ * @template TEvents
+ * @template TStages
+ * @template TGlobals
+ * @template TModules
+ * @template TTranslations
+ */
+export type SignalWarnHookMethod<
+	TEvents extends CoreEventsShape,
+	TStages extends CoreStagesShape,
+	TGlobals extends CoreGlobalsShape,
+	TModules extends CoreModulesShape,
+	TTranslations extends CoreTranslationsShape
+> =
+	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['signalWarn'];
+
+/**
+ * SignalThrowHookMethod
+ *
+ * Type alias for EventsManager.signalThrow.
+ *
+ * Exposed to hooks to emit terminal signal events.
+ *
+ * @template TEvents
+ * @template TStages
+ * @template TGlobals
+ * @template TModules
+ * @template TTranslations
+ */
+export type SignalThrowHookMethod<
+	TEvents extends CoreEventsShape,
+	TStages extends CoreStagesShape,
+	TGlobals extends CoreGlobalsShape,
+	TModules extends CoreModulesShape,
+	TTranslations extends CoreTranslationsShape
+> =
+	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['signalThrow'];
+
+/**
+ * MessageTraceHookMethod
+ *
+ * Type alias for EventsManager.messageTrace.
+ *
+ * Exposed to hooks to emit "trace" level i18n-capable messages.
+ *
+ * @template TEvents
+ * @template TStages
+ * @template TGlobals
+ * @template TModules
+ * @template TTranslations
+ */
+export type MessageTraceHookMethod<
+	TEvents extends CoreEventsShape,
+	TStages extends CoreStagesShape,
+	TGlobals extends CoreGlobalsShape,
+	TModules extends CoreModulesShape,
+	TTranslations extends CoreTranslationsShape
+> =
+	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['messageTrace'];
+
+/**
+ * MessageDebugHookMethod
+ *
+ * Type alias for EventsManager.messageDebug.
+ *
+ * Exposed to hooks to emit "debug" level i18n-capable messages.
+ *
+ * @template TEvents
+ * @template TStages
+ * @template TGlobals
+ * @template TModules
+ * @template TTranslations
+ */
+export type MessageDebugHookMethod<
+	TEvents extends CoreEventsShape,
+	TStages extends CoreStagesShape,
+	TGlobals extends CoreGlobalsShape,
+	TModules extends CoreModulesShape,
+	TTranslations extends CoreTranslationsShape
+> =
+	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['messageDebug'];
+
+/**
+ * MessageInfoHookMethod
+ *
+ * Type alias for EventsManager.messageInfo.
+ *
+ * Exposed to hooks to emit "info" level i18n-capable messages.
+ *
+ * @template TEvents
+ * @template TStages
+ * @template TGlobals
+ * @template TModules
+ * @template TTranslations
+ */
+export type MessageInfoHookMethod<
+	TEvents extends CoreEventsShape,
+	TStages extends CoreStagesShape,
+	TGlobals extends CoreGlobalsShape,
+	TModules extends CoreModulesShape,
+	TTranslations extends CoreTranslationsShape
+> =
+	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['messageInfo'];
+
+/**
+ * MessageWarnHookMethod
+ *
+ * Type alias for EventsManager.messageWarn.
+ *
+ * Exposed to hooks to emit "warning" level i18n-capable messages.
+ *
+ * @template TEvents
+ * @template TStages
+ * @template TGlobals
+ * @template TModules
+ * @template TTranslations
+ */
+export type MessageWarnHookMethod<
+	TEvents extends CoreEventsShape,
+	TStages extends CoreStagesShape,
+	TGlobals extends CoreGlobalsShape,
+	TModules extends CoreModulesShape,
+	TTranslations extends CoreTranslationsShape
+> =
+	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['messageWarn'];
+
+/**
+ * MessageThrowHookMethod
+ *
+ * Type alias for EventsManager.messageThrow.
+ *
+ * Exposed to hooks to emit terminal i18n-capable messages.
+ *
+ * @template TEvents
+ * @template TStages
+ * @template TGlobals
+ * @template TModules
+ * @template TTranslations
+ */
+export type MessageThrowHookMethod<
+	TEvents extends CoreEventsShape,
+	TStages extends CoreStagesShape,
+	TGlobals extends CoreGlobalsShape,
+	TModules extends CoreModulesShape,
+	TTranslations extends CoreTranslationsShape
+> =
+	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['messageThrow'];
 /**
  * SetOutputListenerMethod
  *
  * Type alias for EventsManager.setOutputListener.
  *
- * Allows hooks to register output listeners.
+ * Allows hooks to register passive output listeners only.
  *
  * WARNING:
  * - This impacts global output behavior
  * - Should be used carefully in hooks
+ * - Channels are reserved for output listeners and do not apply to flow listeners
  *
  * @template TEvents
  * @template TStages

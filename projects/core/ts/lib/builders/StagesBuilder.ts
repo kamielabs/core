@@ -1,4 +1,3 @@
-// TODO: V0.1 — CORE_STATES integration may impact stage lifecycle and validation flow
 // NOTE:
 // - This builder performs STRUCTURAL validation (required fields, invariants)
 // - No runtime indexing or deep validation is performed here
@@ -29,6 +28,12 @@ function isBuiltinStage(
  * Builds the final stages dictionary by merging built-in stages
  * with user-defined custom stages.
  *
+ * Lifecycle position:
+ * - executed during `CLI.init()` static bootstrap
+ * - runs before managers exist
+ * - cannot rely on the core event system yet
+ * - therefore reports failures through `CoreError` only
+ *
  * Responsibilities:
  * - Validate structural integrity of custom stages
  * - Enforce invariants for built-in stage extension
@@ -53,6 +58,10 @@ function isBuiltinStage(
  * - No deep validation beyond required structure
  *
  * These are handled later by StagesManager.
+ *
+ * Architectural note:
+ * - this builder is expected to disappear with RFC-0002 once validation/indexing
+ *   fully moves into manager initialization
  *
  * @template TCustomStages - Custom stages shape
  * @param custom - Optional custom stages definition
@@ -110,8 +119,7 @@ export function buildStages<TCustomStages extends CoreStagesShape = {}>(
 			 */
 			if ("file" in customStage) {
 				throw new CoreError(
-					"STAGE_FILE_DUPLICATE",
-					"Builders.buildStages",
+					"stageFileDuplicated",
 					`Stage "${stageName}" cannot override builtin "file"`
 				);
 			}
@@ -123,8 +131,7 @@ export function buildStages<TCustomStages extends CoreStagesShape = {}>(
 			for (const propName in customStage.options) {
 				if (propName in builtin.options) {
 					throw new CoreError(
-						"STAGE_PROP_DUPLICATE",
-						"Builders.buildStages",
+						"stagePropDuplicated",
 						`Stage "${stageName}" prop "${propName}" already exists in builtin props`
 					);
 				}
@@ -154,8 +161,7 @@ export function buildStages<TCustomStages extends CoreStagesShape = {}>(
 		 */
 		if (!customStage.file) {
 			throw new CoreError(
-				"STAGE_FILE_MISSING",
-				"Builders.buildStages",
+				"stageFileMissing",
 				`Custom stage "${stageName}" must declare a "file"`
 			);
 		}
@@ -168,8 +174,7 @@ export function buildStages<TCustomStages extends CoreStagesShape = {}>(
 
 		if (!langOpt || langOpt.env !== LANG_ENV) {
 			throw new CoreError(
-				"STAGE_LANG_MISSING",
-				"Builders.buildStages",
+				"stageLangMissing",
 				`Custom stage "${stageName}" must declare a "lang" option with env "${LANG_ENV}"`
 			);
 		}

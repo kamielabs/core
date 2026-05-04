@@ -1,4 +1,3 @@
-import { ResolverManagerWithDict } from "@abstracts";
 import { Context, GlobalsHook } from "@contexts";
 import { FinalGlobals } from "@data";
 import {
@@ -9,12 +8,10 @@ import {
 	CoreModulesShape,
 	RuntimeGlobalsFacts,
 	CoreTranslationsShape,
-	ExtractGlobals
+	ExtractGlobals,
+	RuntimeStageFacts
 } from "@types";
 
-/**
- * FIX: CRITICAL -> Remove throw errors and create event messages errors (use internalEmit);
- */
 
 /**
  * GlobalsManager
@@ -37,9 +34,11 @@ import {
  * Core concept:
  * - Globals act as the bridge between pre-runtime (stages/env)
  *   and runtime execution (modules/actions)
+ * - Each option belongs to a parent group key used as the final runtime namespace
  *
  * Resolution model:
  * - Each global option is backed by an ENV variable (single source of truth)
+ * - One ENV variable may expose zero to many associated CLI flags
  * - CLI flags (if defined) override ENV values
  * - Final value is always stored in the runtime globals dictionary
  *
@@ -50,6 +49,8 @@ import {
  * - Flags may accept a value → that value is used directly
  * - Flags may be value-less → a predefined value is injected
  * - Multiple flags may map to the same global option
+ * - Builtin globals enable `help` and `version` overrides even in runtimes
+ *   that do not expose standard module selection
  *
  * Design principles:
  * - Deterministic resolution (single pass)
@@ -69,11 +70,12 @@ export class GlobalsManager<
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape
-> extends ResolverManagerWithDict<
-	CoreGlobalsDecl<FinalGlobals<TGlobals>>,
-	RuntimeGlobalsFacts,
-	TEvents, TStages, TGlobals, TModules, TTranslations
 > {
+
+	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private _dict: CoreGlobalsDecl<TGlobals>;
+	private _draft?: RuntimeGlobalsFacts | undefined;
+	private _resolved?: RuntimeGlobalsFacts;
 
 	/**
 	 * Optional developer-defined hook executed after globals resolution.
@@ -97,22 +99,91 @@ export class GlobalsManager<
 	 * @param GlobalsDict - Final globals declaration
 	 */
 	constructor(
-		protected readonly ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>,
+		ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>,
 		GlobalsDict: FinalGlobals<TGlobals>
 	) {
-
-		super(
-			ctx,
-			{
-				options: GlobalsDict,
-				flagIndex: { byKey: {} },
-				envIndex: { byEnv: {} }
-
-			} satisfies CoreGlobalsDecl<TGlobals>
-		);
-		this._resolveIndexes();
+		this._ctx = ctx;
+		this._dict = {
+			options: GlobalsDict,
+			flagIndex: { byKey: {} },
+			envIndex: { byEnv: {} }
+		} satisfies CoreGlobalsDecl<TGlobals>
+		// this._resolveIndexes();
+		// this._freezeDict();
 	}
 
+	public init: () => Promise<void> = async (): Promise<void> => {
+		this._resolveIndexes();
+		this._freezeDict();
+	};
+
+	/**
+	 * Freeze the declaration dictionary once all lookup indexes are prepared.
+	 */
+	private _freezeDict() {
+		this._dict = this._ctx.helpers.core.deepFreeze(this._dict);
+	}
+
+	/**
+	 * Store the mutable globals draft before the final runtime snapshot is frozen.
+	 */
+	private _setDraft(state: RuntimeGlobalsFacts) {
+		this._draft = state;
+	}
+
+	/**
+	 * Clear the mutable globals draft once resolution is finalized.
+	 */
+	private _clearDraft() {
+		this._draft = undefined;
+	}
+
+	/**
+	 * Freeze and persist the final immutable runtime globals facts.
+	 */
+	private _setResolved(state: RuntimeGlobalsFacts): void | never {
+		if (this._resolved) {
+			this._ctx.events.throw('globalsAlreadyResolved');
+		}
+		this._resolved = this._ctx.helpers.core.deepClone(state);
+		this._resolved = this._ctx.helpers.core.deepFreeze(this._resolved);
+	}
+
+	public getDict(): Readonly<CoreGlobalsDecl<TGlobals>> {
+		const dict = this._ctx.helpers.core.deepClone(this._dict);
+		this._ctx.helpers.core.deepFreeze(dict)
+		return dict;
+	}
+
+	/**
+	 * Return the current mutable globals draft.
+	 *
+	 * This state only exists during resolution, before final freezing.
+	 */
+	public getDraft(): RuntimeGlobalsFacts {
+		if (!this._draft) {
+			this._ctx.events.throw('globalsMissingDraft');
+		}
+		return this._draft;
+	}
+
+	/**
+	 * Return the final immutable runtime globals facts.
+	 */
+	public getResolved(): RuntimeGlobalsFacts {
+		if (!this._resolved) {
+			this._ctx.events.throw('globalsMissingResolved');
+		}
+		return this._resolved;
+	}
+
+
+	/**
+	 * Indicates if state is resolved.
+	 */
+	public isResolved(): boolean {
+		return !!this._resolved;
+	}
 	/**
 	 * Resolve lifecycle.
 	 *
@@ -126,40 +197,47 @@ export class GlobalsManager<
 	 * 7. Execute custom hook (if defined)
 	 * 8. Freeze and finalize runtime globals
 	 *
+	 * The parser phase selected here depends on module capabilities:
+	 * `__defaultModule__` runtimes continue directly to `args`, while standard
+	 * runtimes continue to `module`.
+	 *
 	 * @returns Promise<void>
 	 */
 	public async resolve(): Promise<void> {
 
-		this._validate();
+		const bootstrap = this._ctx.bootstrap.getResolved();
 
-		const bootstrap = this.ctx.bootstrap.getResolved();
-		const fileEnv = this.ctx.helpers.core.loadEnvFile(this.ctx.stages.getResolved().file);
+		const stage = this._ctx.stages.getResolved();
+
+		this._validateGlobalsVsStageEnv(stage);
+
+		const fileEnv = this._ctx.helpers.core.loadEnvFile(stage.file);
 
 		const envVars = bootstrap.envs;
 		const hasDefaultModule =
-			Object.prototype.hasOwnProperty.call(this.ctx.modules.getDict().modules, "__defaultModule__");
+			Object.prototype.hasOwnProperty.call(this._ctx.modules.getDict().modules, "__defaultModule__");
 
 		const nextPhase = hasDefaultModule ? "args" : "module";
 
 		// Parse CLI globals
-		this.ctx.parser.resolveGlobals(this.getDict().flagIndex, nextPhase);
+		this._ctx.parser.resolveGlobals(this._dict.flagIndex, nextPhase);
 
 		const resolved = this._resolveGlobalsValues(envVars, fileEnv);
-		this.setDraft(resolved);
+		this._setDraft(resolved);
 
-		this.ctx.events.internalEmit("globalsHooking");
+		await this._ctx.events.emit("globalsHooking");
 
 		if (this._customGlobalsHook) {
 			this._customGlobalsHook({
-				options: this.getDraft() as ExtractGlobals<TGlobals>,
-				runtime: this.ctx.runtime.globalsContext(),
-				tools: this.ctx.tools.globalsContext(),
-				snapshot: this.ctx.snapshot.snapshotContext()
+				options: this._draft as ExtractGlobals<TGlobals>,
+				runtime: this._ctx.runtime.globalsContext(),
+				tools: this._ctx.tools.globalsContext(),
+				snapshot: this._ctx.snapshot.snapshotContext()
 			})
 		}
 
-		this.freezeDict();
-		this.setResolved(resolved);
+		this._setResolved(resolved);
+		this._clearDraft();
 	}
 
 	/**
@@ -178,11 +256,13 @@ export class GlobalsManager<
 	 * - short flags (-f)
 	 * - aliases (short or long)
 	 *
-	 * @throws Error if duplicates are detected
+	 * Group names are preserved in both indexes because they define the parent
+	 * bucket later used by parser storage and runtime globals facts.
+	 *
 	 */
 	private _resolveIndexes() {
 
-		const decl = this.getDict();
+		const decl = this._dict;
 
 		for (const groupName in decl.options) {
 
@@ -195,9 +275,11 @@ export class GlobalsManager<
 
 				// ENV index
 				if (decl.envIndex.byEnv[opt.env]) {
-					throw new Error(
-						`Duplicate ENV variable "${opt.env}" detected in globals`
-					);
+					this._ctx.events.throw('globalsDuplicateEnv', {
+						details: [
+							`${opt.env}`
+						]
+					})
 				}
 				decl.envIndex.byEnv[opt.env] = {
 					env: opt.env,
@@ -210,9 +292,11 @@ export class GlobalsManager<
 				for (const flag of opt.cli) {
 					const longRawkey = `--${flag.long}`;
 					if (decl.flagIndex.byKey[longRawkey]) {
-						throw new Error(
-							`Duplicate CLI flag "${longRawkey}" detected in globals`
-						);
+						this._ctx.events.throw('globalsDuplicateFlag', {
+							details: [
+								`${longRawkey}`
+							]
+						});
 					}
 					decl.flagIndex.byKey[longRawkey] = {
 						key: flag.long,
@@ -226,9 +310,11 @@ export class GlobalsManager<
 					if (flag.short) {
 						const shortRawkey = `-${flag.short}`;
 						if (decl.flagIndex.byKey[shortRawkey]) {
-							throw new Error(
-								`Duplicate CLI flag "-${flag.short}" detected in globals`
-							);
+							this._ctx.events.throw('globalsDuplicateFlag', {
+								details: [
+									`${flag.short}`
+								]
+							});
 						}
 						decl.flagIndex.byKey[shortRawkey] = {
 							key: flag.short,
@@ -245,9 +331,11 @@ export class GlobalsManager<
 							if (alias.length === 1) {
 								const shortAliasRawKey = `-${alias}`;
 								if (decl.flagIndex.byKey[alias]) {
-									throw new Error(
-										`Duplicate CLI flag "${shortAliasRawKey}" detected in globals`
-									);
+									this._ctx.events.throw('globalsDuplicateFlag', {
+										details: [
+											`${shortAliasRawKey}`
+										]
+									});
 								}
 								decl.flagIndex.byKey[shortAliasRawKey] = {
 									key: alias,
@@ -260,9 +348,11 @@ export class GlobalsManager<
 							} else {
 								const longAliasRawKey = `--${alias}`
 								if (decl.flagIndex.byKey[alias]) {
-									throw new Error(
-										`Duplicate CLI flag "${longAliasRawKey}" detected in globals`
-									);
+									this._ctx.events.throw('globalsDuplicateFlag', {
+										details: [
+											`${longAliasRawKey}`
+										]
+									});
 								}
 								decl.flagIndex.byKey[longAliasRawKey] = {
 									key: alias,
@@ -293,6 +383,7 @@ export class GlobalsManager<
 	 * Important:
 	 * - CLI values are already parsed and normalized by ParserManager
 	 * - Final values are stored grouped by global group
+	 * - ENV remains the canonical declaration source even when CLI flags are exposed
 	 *
 	 * @param envVars - Environment variables from bootstrap
 	 * @param fileEnv - Parsed ENV file values
@@ -301,12 +392,13 @@ export class GlobalsManager<
 	private _resolveGlobalsValues(
 		envVars: Record<string, string | undefined>,
 		fileEnv: Record<string, string>
-	): RuntimeGlobalsFacts {
+	): RuntimeGlobalsFacts | never {
 
-		const decl = this.getDict();
+		const decl = this._dict;
 		const resolved: RuntimeGlobalsFacts = {};
+		const parserContext = this._ctx.parser.getContext();
 
-		const cliGlobals = this.ctx.parser.getContext().globals ?? {};
+		const cliGlobals = parserContext.globals ?? {};
 
 		for (const groupName in decl.options) {
 
@@ -325,12 +417,12 @@ export class GlobalsManager<
 
 				// ENV FILE override
 				if (envKey && fileEnv[envKey] !== undefined) {
-					resolved[groupName][optionName] = this.ctx.helpers.core.castEnvValue(fileEnv[envKey], defaultValue);
+					resolved[groupName][optionName] = this._ctx.helpers.core.castEnvValue(fileEnv[envKey], defaultValue);
 				}
 
 				// ENV VAR override
 				if (envKey && envVars[envKey] !== undefined) {
-					resolved[groupName][optionName] = this.ctx.helpers.core.castEnvValue(envVars[envKey] as string, defaultValue);
+					resolved[groupName][optionName] = this._ctx.helpers.core.castEnvValue(envVars[envKey] as string, defaultValue);
 				}
 
 				// CLI override
@@ -356,20 +448,19 @@ export class GlobalsManager<
 	 * - ambiguous resolution sources
 	 * - undefined override behavior
 	 *
-	 * @throws Error if collision is detected
 	 */
-	private _validate() {
-		const runtimeStage = this.ctx.stages.getResolved().name;
-		const globalsEnvIndex = this.getDict().envIndex.byEnv;
-		const stageEnvIndex = this.ctx.stages.getDict().envIndex.byStage[runtimeStage];
+	private _validateGlobalsVsStageEnv(stage: RuntimeStageFacts): void | never {
+		const runtimeStage = stage.name;
+		const globalsEnvIndex = this._dict.envIndex.byEnv;
+		const stageEnvIndex = this._ctx.stages.getDict().envIndex.byStage[runtimeStage];
 		const stageEnv = stageEnvIndex?.byEnv ?? {};
 
 		for (const env in globalsEnvIndex) {
 
 			if (stageEnv[env]) {
-				throw new Error(
-					`ENV "${env}" already declared in stage "${runtimeStage}" props`
-				);
+				this._ctx.events.throw('globalsConflictEnv', {
+					details: [`${env}`, `stage: ${runtimeStage}`]
+				})
 			}
 
 		}
@@ -379,9 +470,9 @@ export class GlobalsManager<
 	 * Register a custom globals hook.
 	 *
 	 * Notes:
-	 * - Builtin globals cannot be extended or mutated structurally
-	 * - Hook operates only on resolved values
-	 * - Designed for runtime adjustments, not declaration changes
+	 * - Builtin globals remain declaration-owned by the core
+	 * - Hook operates after values are resolved and before final freezing
+	 * - Hook is runtime-facing only, not a declaration mutation point
 	 *
 	 * @param hook - GlobalsHook implementation
 	 */

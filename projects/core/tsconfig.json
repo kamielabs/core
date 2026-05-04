@@ -5,6 +5,7 @@
 		"./tsconfig.paths.json"
 	],
 	"include": [
-		"ts/**/*.ts"
+		"ts/**/*.ts",
+		"tests/**/*.ts"
 	]
 }

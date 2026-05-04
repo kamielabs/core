@@ -5,20 +5,21 @@ import { addModules, configureCLI, setStageBuiltinDefaults } from "./CLIHookTest
 export const cli = CLI.init({
 	settings: {
 		coreConsoleLevel: 'trace',
-		defaultStageName: "dev"
+		defaultStageName: "dev",
+		engine: "fed"
 	},
 	events: {
 		testEventCustom1: {
-			code: "TEST_EVENT_CUSTOM1",
+			name: "TEST_EVENT_CUSTOM1",
 			phase: CoreEventPhase.runtime,
 			kind: CoreEventKind.message,
-			level: CoreEventLevel.trace
+			level: CoreEventLevel.fatal
 		},
 		testEventCustom2: {
-			code: "TEST_EVENT_CUSTOM2",
+			name: "TEST_EVENT_CUSTOM2",
 			phase: CoreEventPhase.runtime,
 			kind: CoreEventKind.signal,
-			level: CoreEventLevel.trace
+			level: CoreEventLevel.error
 		}
 	},
 	stages: {
@@ -26,6 +27,10 @@ export const cli = CLI.init({
 			options: {
 				opt1: {
 					env: "STAGE_OPT1",
+					default: "Stage Option 1"
+				},
+				opt2: {
+					env: "STAGE_OPT2",
 					default: "Stage Option 1"
 				}
 			}
@@ -41,7 +46,17 @@ export const cli = CLI.init({
 					short: 'g',
 					value: true
 				}]
+			},
+			testGlobal2: {
+				env: 'OPT_GLOBAL2',
+				default: false,
+				cli: [{
+					long: 'global2',
+					short: 'n',
+					value: true
+				}]
 			}
+
 		}
 
 	},
@@ -122,6 +137,7 @@ async function main() {
 
 	// and run the cli, nothing more in main use file
 	await cli.run()
+
 
 }
 

@@ -164,7 +164,7 @@ async function runTest(test: TestCase) {
 
 		events: {
 			testEventCustom1: {
-				code: "TEST_EVENT_CUSTOM1",
+				name: "TEST_EVENT_CUSTOM1",
 				phase: CoreEventPhase.declarative,
 				kind: CoreEventKind.signal,
 				level: CoreEventLevel.trace

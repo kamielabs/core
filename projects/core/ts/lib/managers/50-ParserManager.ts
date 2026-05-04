@@ -1,4 +1,3 @@
-import { ResolverManager } from "@abstracts";
 import { Context } from "@contexts";
 
 import {
@@ -42,13 +41,14 @@ import {
  * - Delegate parsing logic to specialized helpers
  * - Collect parsing issues (non-fatal errors)
  * - Maintain parsing state (cursor, phase, stop flag)
- * - Produce ParsedCliContextResult
+ * - Produce ParsedCliContextResult snapshots after each resolved phase
  *
  * Core design:
  * - Single-pass, left-to-right parsing
  * - Phase-driven parsing (strict lifecycle)
  * - Deterministic and predictable behavior
  * - No backtracking
+ * - Long-lived lifecycle spanning from post-stages initialization to final runtime resolution
  *
  * Parsing phases:
  * - init → initialization
@@ -73,8 +73,8 @@ import {
  * Design principles:
  * - Strict separation of phases
  * - Helpers contain parsing logic, manager orchestrates flow
+ * - `resolved` is intentionally refreshed phase by phase
  * - No mutation after finalize()
- * - Errors during parsing are collected, not thrown
  *
  * @template TEvents
  * @template TStages
@@ -88,14 +88,23 @@ export class ParserManager<
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape
-> extends ResolverManager<
-	ParsedCliContextResult,
-	TEvents,
-	TStages,
-	TGlobals,
-	TModules,
-	TTranslations
 > {
+
+	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	/**
+	 * Accumulated parsing result.
+	 *
+	 * - context → parsed CLI structure
+	 * - ignored → unused tokens
+	 * - issues → non-fatal parsing problems
+	 */
+	private _draft: ParsedCliContextResult | undefined = {
+		context: {},
+		ignored: [],
+		issues: []
+	};
+
+	private _resolved?: ParsedCliContextResult;
 
 	/**
 	 * Raw CLI tokens extracted from process arguments.
@@ -118,27 +127,59 @@ export class ParserManager<
 	private stop = false;
 
 	/**
-	 * Accumulated parsing result.
-	 *
-	 * - context → parsed CLI structure
-	 * - ignored → unused tokens
-	 * - issues → non-fatal parsing problems
-	 */
-	private result: ParsedCliContextResult = {
-		context: {},
-		ignored: [],
-		issues: []
-	};
-
-	/**
 	 * Constructor.
 	 *
 	 * @param ctx - Global execution context
 	 */
 	constructor(
-		protected readonly ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>
+		ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>
 	) {
-		super(ctx);
+		this._ctx = ctx;
+	}
+
+	public init: () => Promise<void> = async (): Promise<void> => { };
+
+	public getDraft(): ParsedCliContextResult {
+		if (!this._draft) {
+			this._ctx.events.throw('parserMissingDraft');
+		}
+		return this._draft;
+	}
+
+	private _clearDraft() {
+		this._draft = undefined;
+	}
+
+	/**
+	 * Refresh the latest resolved parser snapshot.
+	 *
+	 * Unlike other managers, parser resolution is incremental: each completed
+	 * phase updates `_resolved` so downstream runtime steps can safely consume
+	 * the latest strict procedural state.
+	 */
+	private _setResolved(state: ParsedCliContextResult) {
+		this._resolved = state;
+		this._resolved = this._ctx.helpers.core.deepFreeze(this._resolved);
+	}
+
+	/**
+	 * Return the latest resolved parser snapshot.
+	 *
+	 * This may represent a partial but valid state while the parser lifecycle
+	 * is still in progress.
+	 */
+	public getResolved(): ParsedCliContextResult {
+		if (!this._resolved) {
+			this._ctx.events.throw('parserMissingResolved');
+		}
+		return this._resolved;
+	}
+
+	/**
+	 * Indicates if state is resolved.
+	 */
+	public isResolved(): boolean {
+		return !!this._resolved;
 	}
 
 	// -----------------------------------------------------
@@ -155,23 +196,18 @@ export class ParserManager<
 	 * - Set phase to "globalFlags"
 	 *
 	 * This method must be called before any parsing phase.
+	 * It reinitializes the parser lifecycle from raw bootstrap arguments and is
+	 * intentionally reusable across runs, but never mid-lifecycle.
 	 */
-	public resolve(): void | Promise<void> {
+	public async resolve(): Promise<void> {
 
-		this.ctx.events.internalEmit('parserInit');
-
-		const bootstrap = this.ctx.bootstrap.getResolved();
+		const bootstrap = this._ctx.bootstrap.getResolved();
 		const args = bootstrap.script.args;
 
 		this.tokens = [...args];
 		this.cursor = 0;
 		this.stop = false;
 
-		this.result = {
-			context: {},
-			ignored: [],
-			issues: []
-		};
 
 		this.phase = "globalFlags";
 	}
@@ -192,6 +228,7 @@ export class ParserManager<
 	 * Special handling:
 	 * - Detects "help" and "version" flags
 	 * - Forces phase transition to "args" if detected
+	 * - Persists an intermediate resolved snapshot once the phase is complete
 	 *
 	 * Phase transition:
 	 * - "globalFlags" → nextPhase OR "args"
@@ -199,12 +236,15 @@ export class ParserManager<
 	 * @param flagIndex - Global flags index
 	 * @param nextPhase - Next phase ("module" or "args")
 	 *
-	 * @throws Error if called outside "globalFlags" phase
 	 */
 	public resolveGlobals(flagIndex: FlagIndex, nextPhase: 'module' | 'args' = 'module') {
 
-		if (this.phase !== "globalFlags") {
-			throw new Error("ParserManager: resolveGlobals() called in invalid phase.");
+		const neededPhase = 'globalFlags';
+
+		if (this.phase !== neededPhase) {
+			this._ctx.events.throw('parserInvalidPhase', {
+				values: { neededPhase, currentPhase: this.phase, method: 'resolveGlobals' }
+			});
 		}
 
 		const parsed = ParsingHelpers.parseFlagsPhase(
@@ -232,9 +272,9 @@ export class ParserManager<
 			grouped[groupName][optionName] = value;
 		}
 
-		this.result.context.globals = grouped;
+		this.getDraft().context.globals = grouped;
 
-		this.result.issues.push(...parsed.issues);
+		this.getDraft().issues.push(...parsed.issues);
 
 		// Hardcoded help and version detection
 		const hasHelp = parsed.values["help"] === true;
@@ -245,6 +285,8 @@ export class ParserManager<
 		} else {
 			this.phase = nextPhase;
 		}
+
+		this._setResolved(this._ctx.helpers.core.deepClone(this.getDraft()));
 	}
 
 	/**
@@ -252,11 +294,14 @@ export class ParserManager<
 	 *
 	 * Used when parsing must skip module/action resolution.
 	 *
-	 * @throws Error if called outside "args" phase
 	 */
 	public finalizeArgsPhase() {
-		if (this.phase !== "args") {
-			throw new Error("ParserManager: finalizeArgsPhase() called in invalid phase.");
+		const neededPhase = 'args';
+
+		if (this.phase !== neededPhase) {
+			this._ctx.events.throw('parserInvalidPhase', {
+				values: { neededPhase, currentPhase: this.phase, method: 'finalizeArgsPhase' }
+			});
 		}
 		this._finalizeArgs();
 		return;
@@ -281,6 +326,8 @@ export class ParserManager<
 	 * - Invalid module → immediate args fallback
 	 * - defaultAction modules skip module flags and action parsing
 	 * - stop flag terminates parsing early
+	 * - The heavy parsing mechanics stay delegated to helpers so this manager
+	 *   remains an orchestration layer
 	 *
 	 * Phase transitions:
 	 * - module → moduleFlags → action → actionFlags → args → done
@@ -290,7 +337,6 @@ export class ParserManager<
 	 * @param moduleFlagIndex - Optional module flags index
 	 * @param actionFlagIndex - Optional action flags index
 	 *
-	 * @throws Error if called outside "module" phase
 	 */
 	public resolveModule(
 		moduleIndex: ModuleIndex,
@@ -299,10 +345,15 @@ export class ParserManager<
 		actionFlagIndex?: FlagIndex
 	) {
 
-		if (this.phase !== "module") {
-			throw new Error("ParserManager: resolveModule() called in invalid phase.");
+		const neededPhase = 'module';
+
+		if (this.phase !== neededPhase) {
+			this._ctx.events.throw('parserInvalidPhase', {
+				values: { neededPhase, currentPhase: this.phase, method: 'resolveModule' }
+			});
 		}
 
+		const draft = this.getDraft();
 		// -------------------------------------------------
 		// MODULE KEYWORD
 		// -------------------------------------------------
@@ -317,13 +368,13 @@ export class ParserManager<
 		this.cursor = moduleResult.cursor;
 		this.stop = moduleResult.stopParsing;
 
-		this.result.issues.push(...moduleResult.issues);
+		draft.issues.push(...moduleResult.issues);
 
 		let moduleShape;
 
 		if (moduleResult.value) {
 			const resolved = ModulesHelpers.resolveModuleName(moduleIndex, moduleResult.value);
-			this.result.context.module = resolved;
+			draft.context.module = resolved;
 			moduleShape = moduleIndex.byName[resolved];
 		}
 
@@ -357,11 +408,12 @@ export class ParserManager<
 			this.cursor = moduleFlags.cursor;
 			this.stop = moduleFlags.stopParsing;
 
-			this.result.context.moduleOptions = moduleFlags.values;
+			draft.context.moduleOptions = moduleFlags.values;
 
-			this.result.issues.push(...moduleFlags.issues);
+			draft.issues.push(...moduleFlags.issues);
 
 			if (this.stop) {
+				this.phase = "args";
 				this._finalizeArgs();
 				return;
 			}
@@ -377,7 +429,7 @@ export class ParserManager<
 
 			const defaultAction = Object.keys(moduleShape.defaultAction!)[0];
 
-			this.result.context.action = defaultAction;
+			draft.context.action = defaultAction;
 
 		} else {
 
@@ -390,7 +442,7 @@ export class ParserManager<
 				(action) =>
 					ModulesHelpers.actionExists(
 						actionIndex,
-						this.result.context.module!,
+						draft.context.module!,
 						action
 					)
 			);
@@ -398,20 +450,21 @@ export class ParserManager<
 			this.cursor = actionResult.cursor;
 			this.stop = actionResult.stopParsing;
 
-			this.result.issues.push(...actionResult.issues);
+			draft.issues.push(...actionResult.issues);
 
 			if (actionResult.value) {
 
 				const resolved = ModulesHelpers.resolveActionName(
 					actionIndex,
-					this.result.context.module!,
+					draft.context.module!,
 					actionResult.value
 				);
 
-				this.result.context.action = resolved;
+				draft.context.action = resolved;
 			}
 
 			if (this.stop) {
+				this.phase = "args";
 				this._finalizeArgs();
 				return;
 			}
@@ -435,11 +488,12 @@ export class ParserManager<
 			this.cursor = actionFlags.cursor;
 			this.stop = actionFlags.stopParsing;
 
-			this.result.context.actionOptions = actionFlags.values;
+			draft.context.actionOptions = actionFlags.values;
 
-			this.result.issues.push(...actionFlags.issues);
+			draft.issues.push(...actionFlags.issues);
 
 			if (this.stop) {
+				this.phase = "args";
 				this._finalizeArgs();
 				return;
 			}
@@ -450,6 +504,7 @@ export class ParserManager<
 		// -------------------------------------------------
 
 		this.phase = "args";
+		this._setResolved(this._ctx.helpers.core.deepClone(draft));
 		this._finalizeArgs();
 	}
 
@@ -461,6 +516,7 @@ export class ParserManager<
 	 * Finalize argument collection phase.
 	 *
 	 * Collects remaining tokens as positional arguments.
+	 * This is the last procedural parsing step before `finalize()`.
 	 *
 	 * Phase transition:
 	 * - args → done
@@ -474,9 +530,11 @@ export class ParserManager<
 
 		this.cursor = argsResult.cursor;
 
-		this.result.context.args = argsResult.args;
+		this.getDraft().context.args = argsResult.args;
 
 		this.phase = "done";
+
+		this._setResolved(this._ctx.helpers.core.deepClone(this.getDraft()));
 	}
 
 	// -----------------------------------------------------
@@ -489,7 +547,7 @@ export class ParserManager<
 	 * @returns RuntimeCliContext
 	 */
 	public getContext(): RuntimeCliContext {
-		return this.result.context;
+		return this.getResolved().context;
 	}
 
 	/**
@@ -500,7 +558,7 @@ export class ParserManager<
 	 * @returns ParserIssue[]
 	 */
 	public getIssues(): ParserIssue[] {
-		return this.result.issues;
+		return this.getResolved().issues;
 	}
 
 	/**
@@ -511,7 +569,7 @@ export class ParserManager<
 	 * @returns string[]
 	 */
 	public getIgnored(): string[] {
-		return this.result.ignored;
+		return this.getResolved().ignored;
 	}
 
 	/**
@@ -530,22 +588,28 @@ export class ParserManager<
 	/**
 	 * Finalize parsing process.
 	 *
-	 * Validates that parsing is complete and marks result as resolved.
+	 * Validates that parsing is complete and closes the parser lifecycle.
+	 *
+	 * At this point:
+	 * - the latest resolved snapshot becomes final
+	 * - the mutable draft is discarded
+	 * - downstream managers must only consume resolved parser state
 	 *
 	 * Emits:
-	 * - parserFatal if parsing is incomplete
-	 * - parsingDone when successful
-	 *
-	 * @throws Error if parsing is not in "done" phase
+	 * - `parserInvalidPhase` if parsing is incomplete
 	 */
-	public async finalize(): Promise<void> {
+	public finalize(): void {
 
-		if (this.phase !== "done") {
-			await this.ctx.events.internalEmit('parserFatal');
-			throw new Error("ParserManager: parsing not finished.");
+		const neededPhase = 'done';
+		if (this.phase !== neededPhase) {
+			this._ctx.events.throw('parserInvalidPhase', {
+				values: {
+					neededPhase, currentPhase: this.phase, method: 'finalize'
+				}
+			});
 		}
 
-		this.setResolved(this.result);
-		await this.ctx.events.internalEmit('parsingDone');
+		this._setResolved(this._ctx.helpers.core.deepClone(this.getDraft()));
+		this._clearDraft();
 	}
 }

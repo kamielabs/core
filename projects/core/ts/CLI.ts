@@ -5,7 +5,7 @@ import {
 	buildModules,
 	buildTranslations
 } from "@builders";
-import { Context } from "@contexts";
+import { Context, ContextCoreReady } from "@contexts";
 import { FinalEvents, FinalGlobals, FinalModules, FinalStages, FinalTranslations } from "@data";
 import { CoreEngine } from "@engines";
 import { CoreError, CoreHelpers } from "@helpers";
@@ -65,13 +65,17 @@ import {
  * - Provides the root Context shared across the system
  *
  * Initialization flow:
- * 1. Override settings
- * 2. Setup providers
- * 3. Initialize helpers
- * 4. Initialize EventsManager
- * 5. Initialize core services (console, runtime, tools, snapshot, api)
- * 6. Initialize managers (bootstrap → stages → i18n → parser → globals → modules)
- * 7. Initialize engine
+ * 1. `CLI.init()` performs declarative building + instance setup
+ * 2. constructor wires providers, helpers, and `EventsManager`
+ * 3. `run()` performs async manager/service initialization
+ * 4. engine starts the actual runtime lifecycle
+ *
+ * Setup vs init:
+ * - setup = synchronous instantiation/wiring of the core graph
+ * - init = early runtime readiness phase where managers/services validate,
+ *   freeze, and prepare their internal structures
+ * - `EventsManager` is the exception: it must be usable from construction time
+ *   because the rest of the core cannot meaningfully exist before it
  *
  * Context structure:
  * - settings → global configuration
@@ -83,7 +87,7 @@ import {
  * Design principles:
  * - Deterministic initialization order
  * - Explicit dependency wiring
- * - No lazy initialization
+ * - Async-capable initialization without lazy runtime wiring
  * - Centralized error handling
  *
  * Error handling:
@@ -107,11 +111,11 @@ import {
  * @template TTranslations
  */
 export class CLI<
-	TEvents extends CoreEventsShape,
-	TStages extends CoreStagesShape,
-	TGlobals extends CoreGlobalsShape,
-	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	const TEvents extends CoreEventsShape,
+	const TStages extends CoreStagesShape,
+	const TGlobals extends CoreGlobalsShape,
+	const TModules extends CoreModulesShape,
+	const TTranslations extends CoreTranslationsShape
 > {
 
 	/**
@@ -148,7 +152,13 @@ export class CLI<
 	/**
 	 * Private constructor.
 	 *
-	 * Builds entire core system.
+	 * Performs synchronous setup of the full core object graph.
+	 *
+	 * This is setup only:
+	 * - declarations are already built before construction
+	 * - providers/helpers are wired immediately
+	 * - `EventsManager` is created immediately
+	 * - all other managers/services are only instantiated here and initialized later
 	 */
 	private constructor(options: {
 		settings?: CLISettings | undefined;
@@ -159,58 +169,100 @@ export class CLI<
 		modules: FinalModules<TModules>,
 	}) {
 
+		// Basic CLI settings ovverriding
 		this._overrideSettings(options.settings);
 
+		// Providers for external imports in the core
 		this._ctx.providers = this._setupProviders();
 		this._ctx.ready.providers = true;
 
+		// helpers iare methods available for the core
 		this._ctx.helpers.core = new CoreHelpers(this._ctx);
 		this._ctx.ready.helpers = true;
 
+		// Eventually the real first class, the events, everything else is based on it
 		this._ctx.events = new EventsManager(this._ctx, options.events);
 		this._ctx.ready.events = true;
 
+		// Now Managers/Services car be instanciate
+		this._setupContext(options);
+	}
+
+	/**
+	 * Instantiate every manager, service, and engine after the foundational
+	 * setup pieces are ready.
+	 *
+	 * At this stage components are only constructed, not fully initialized.
+	 * Their async `init()` methods are executed later by `_initContext()`.
+	 */
+	private _setupContext(options: {
+		settings?: CLISettings | undefined;
+		events: FinalEvents<TEvents>,
+		stages: FinalStages<TStages>,
+		translations: FinalTranslations<TTranslations>,
+		globals: FinalGlobals<TGlobals>,
+		modules: FinalModules<TModules>,
+	}) {
+
+		// Start all services
 		this._ctx.coreconsole = new CoreConsoleService(this._ctx);
-		this._ctx.ready.coreconsole = true;
-
-		this._ctx.meta = new MetaManager(this._ctx);
-		this._ctx.ready.meta = true;
-
 		this._ctx.runtime = new RuntimeService(this._ctx);
-		this._ctx.ready.runtime = true;
-
 		this._ctx.tools = new ToolsService(this._ctx);
-		this._ctx.ready.tools = true;
-
 		this._ctx.snapshot = new SnapshotService(this._ctx);
-		this._ctx.ready.snapshot = true;
-
 		this._ctx.devapi = new ApiService(this._ctx);
-		this._ctx.ready.devapi = true;
 
+		// Start now managers
+		this._ctx.meta = new MetaManager(this._ctx);
 		this._ctx.bootstrap = new BootstrapManager(this._ctx);
-		this._ctx.ready.bootstrap = true;
-
 		this._ctx.stages = new StagesManager(this._ctx, options.stages);
-		this._ctx.ready.stages = true;
-
 		this._ctx.i18n = new I18nManager(this._ctx, options.translations);
-		this._ctx.ready.i18n = true;
-
 		this._ctx.parser = new ParserManager(this._ctx);
-		this._ctx.ready.parser = true;
-
 		this._ctx.globals = new GlobalsManager(this._ctx, options.globals);
-		this._ctx.ready.globals = true;
-
 		this._ctx.modules = new ModulesManager(this._ctx, options.modules);
-		this._ctx.ready.modules = true;
 
+		// And finally engine
 		this._ctx.engine = new CoreEngine(this._ctx);
-		this._ctx.ready.engine = true;
 
 	}
 
+	/**
+	 * Execute the early async initialization phase for all services/managers.
+	 *
+	 * This is the real pre-runtime readiness pass:
+	 * - each component validates and prepares its internal state
+	 * - readiness flags are updated as initialization succeeds
+	 * - the engine is initialized last because it depends on the rest of the graph
+	 */
+	private async _initContext() {
+		// Services Init First
+		await this._initManager('coreconsole', this._ctx.coreconsole.init);
+		await this._initManager('runtime', this._ctx.runtime.init);
+		await this._initManager('tools', this._ctx.tools.init);
+		await this._initManager('snapshot', this._ctx.snapshot.init);
+		await this._initManager('devapi', this._ctx.devapi.init);
+
+
+		await this._initManager('meta', this._ctx.meta.init);
+		await this._initManager('bootstrap', this._ctx.bootstrap.init);
+		await this._initManager('stages', this._ctx.stages.init);
+		await this._initManager('i18n', this._ctx.i18n.init);
+		await this._initManager('parser', this._ctx.parser.init);
+		await this._initManager('globals', this._ctx.globals.init);
+		await this._initManager('modules', this._ctx.modules.init);
+
+		await this._initManager('engine', this._ctx.engine.init);
+	}
+
+	/**
+	 * Initialize one context component and mark its readiness flag.
+	 */
+	private async _initManager<K extends keyof ContextCoreReady>(
+		key: K,
+		init: () => Promise<void>
+	) {
+		await init();
+		this._ctx.ready[key] = true;
+	}
 	/**
 	 * Override default CLI settings.
 	 */
@@ -235,24 +287,37 @@ export class CLI<
 	/**
 	 * Centralized error handler.
 	 *
+	 * This method normalizes both `CoreError` and unexpected thrown errors into
+	 * the same final panic path, so raw Node.js stacks do not leak into the
+	 * default CLI output.
+	 *
 	 * @throws never
 	 */
-	private static handleCoreError(err: unknown): never {
+	private static handleCoreError(err: unknown, desc?: string): never {
 		if (err instanceof CoreError) {
-			CoreError.panic(err.type, err.source, err.desc);
+			CoreError.panic(err.key, err.desc);
 		}
 
+		if (err instanceof Error) {
+			CoreError.panic("unknownError", err.message);
+		}
+
+
 		CoreError.panic(
-			"UNHANDLED_ERROR",
-			"CLI",
-			err instanceof Error ? err.message : "Unknown error"
+			"unknownError",
+			desc ?? "Unknown CLI Error"
 		);
 	}
 
 	/**
-	 * Initialize CLI instance.
+	 * Build the public CLI instance from declarative user options.
 	 *
-	 * Builds all declarations and returns configured CLI.
+	 * This is the public setup entrypoint:
+	 * - runs every builder in the pre-init phase
+	 * - validates builder-level constraints through `CoreError`
+	 * - constructs the CLI object graph
+	 *
+	 * It does not start manager/service async initialization yet.
 	 */
 	static init<
 		const TEvents extends CoreEventsShape,
@@ -267,8 +332,7 @@ export class CLI<
 		try {
 			if (CLI.isInstanciated) {
 				throw new CoreError(
-					"CLI_INSTANCE_DUPLICATED",
-					"CLI.init",
+					"instanceDuplicated",
 					`CLI is already init !`
 				)
 			}
@@ -301,6 +365,16 @@ export class CLI<
 	}
 
 	/**
+	 * Expose the full internal context.
+	 *
+	 * This remains a low-level surface intended mostly for internal work and
+	 * advanced debugging; the stable developer-facing API is `hooks()`.
+	 */
+	public ctx(): Readonly<Context<TEvents, TStages, TGlobals, TModules, TTranslations>> {
+		return this._ctx;
+	}
+
+	/**
 	 * Destroy CLI instance (testing only).
 	 */
 	public static async destroy() {
@@ -308,16 +382,21 @@ export class CLI<
 	}
 
 	/**
-	 * Execute CLI.
+	 * Execute the CLI runtime.
 	 *
-	 * Delegates to CoreEngine.
+	 * Steps:
+	 * - initialize services/managers in their early runtime phase
+	 * - delegate lifecycle execution to the selected engine
 	 */
 	public async run() {
 		try {
-			await this._ctx.engine.run()
+			// Init and freeze for real all services and managers now we start the core
+			await this._initContext();
+			// Run the full Runtime with all customization, hooks, etc 
+			await this._ctx.engine.run();
 		}
 		catch (err) {
-			CLI.handleCoreError(err)
+			CLI.handleCoreError(err);
 		}
 	}
 }

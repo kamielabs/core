@@ -1,4 +1,3 @@
-// TODO: V0.1 — CORE_STATES integration may impact i18n resolution lifecycle
 // NOTE:
 // - Builders perform minimal validation only (no deep consistency checks)
 // - Full runtime validation and usage guarantees are handled by I18nManager
@@ -20,6 +19,12 @@ import {
  * Builds the final translations dictionary by merging built-in messages
  * with user-provided custom translations.
  *
+ * Lifecycle position:
+ * - executed during `CLI.init()` static bootstrap
+ * - runs before managers exist
+ * - cannot rely on the core event system yet
+ * - therefore reports failures through `CoreError` only
+ *
  * Responsibilities:
  * - Prevent override of existing built-in message keys (per language)
  * - Merge built-in and custom translations
@@ -37,6 +42,10 @@ import {
  * - No runtime guarantees
  *
  * These are handled later by the I18nManager.
+ *
+ * Architectural note:
+ * - this builder is expected to disappear with RFC-0002 once validation/indexing
+ *   fully moves into manager initialization
  *
  * @template TCustom - Custom translations shape
  * @param custom - Optional custom translations dictionary
@@ -75,8 +84,7 @@ export function buildTranslations<TCustom extends CoreTranslationsShape = {}>(
 		for (const key of Object.keys(customLangDict)) {
 			if (key in builtinLangDict) {
 				throw new CoreError(
-					"I18N_MESSAGE_DUPLICATE",
-					"i18Builder.buildTranslations",
+					"i18nMessageDuplicated",
 					`Translation key "${key}" already exists in builtin lang "${String(lang)}" (override forbidden)`
 				);
 			}

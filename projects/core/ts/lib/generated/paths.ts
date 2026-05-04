@@ -4,7 +4,6 @@ export type AliasMap = Record<string, string[]>;
 export const PATHS: AliasMap = {
   "@core": ["ts"],
   "@tests": ["tests"],
-  "@abstracts": ["ts/lib/abstracts"],
   "@types": ["ts/lib/types"],
   "@providers": ["ts/lib/providers"],
   "@providers/id": ["ts/lib/providers/id"],
@@ -14,6 +13,7 @@ export const PATHS: AliasMap = {
   "@contexts": ["ts/lib/contexts"],
   "@helpers": ["ts/lib/helpers"],
   "@data": ["ts/lib/data"],
+  "@data/events": ["ts/lib/data/events"],
   "@data/modules": ["ts/lib/data/modules"],
   "@locales": ["ts/lib/data/locales"],
   "@builders": ["ts/lib/builders"],

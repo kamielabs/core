@@ -44,19 +44,19 @@ export function addModules() {
 	// 	console.log(runtime.module);
 	// })
 
-	cli.hooks().onModuleAction('test', '__defaultAction__', ({ tools, options, runtime }) => {
+	cli.hooks().onModuleAction('test', '__defaultAction__', async ({ options, runtime }) => {
 
-		tools.signal('testEventCustom2');
+		//tools.message.throw('testEventCustom1');
 		console.log("Hooking ! action test.__defaultAction__ OK !");
 		console.log(runtime.globals)
 		console.log(runtime.module)
 		console.log(options)
 	});
-	cli.hooks().onModuleAction('test2', 'testAction', ({ runtime, tools, snapshot, options }) => {
+	cli.hooks().onModuleAction('test2', 'testAction', ({ runtime, snapshot, options }) => {
 		if (snapshot) {
 			console.log(snapshot.modules)
 		}
-		tools.signal('testEventCustom2');
+		//tools.signal.throw('testEventCustom2');
 		console.log(runtime.globals);
 		console.log("Hooking ! action test2.testAction OK !");
 		console.log(options)

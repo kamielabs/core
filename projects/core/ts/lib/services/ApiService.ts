@@ -1,4 +1,3 @@
-import { Service } from "@abstracts";
 import {
 	CoreEventsShape,
 	CoreGlobalsShape,
@@ -34,9 +33,10 @@ import {
  * - Module hooks
  * - Module action hooks
  *
- * Architectural role:
- * - Acts as a bridge between CLI.ts (userland entrypoint) and internal managers
- * - Ensures only safe and intended extension points are exposed
+	 * Architectural role:
+	 * - Acts as a bridge between CLI.ts (userland entrypoint) and internal managers
+	 * - Ensures only safe and intended extension points are exposed
+	 * - Centralizes hook registration behind a single developer-facing service
  *
  * Design principles:
  * - No business logic
@@ -44,9 +44,10 @@ import {
  * - Thin wrapper over Context managers
  * - Stable public API surface for developers
  *
- * Usage:
- * - Exposed via CLI interface
- * - Used by developers to register hooks during initialization phase
+	 * Usage:
+	 * - Exposed via CLI interface
+	 * - Used by developers to register hooks after CLI initialization and before CLI running
+	 * - Not intended to expose managers, runtime state or low-level internals directly
  *
  * Notes:
  * - Method names are part of public API → should remain stable
@@ -65,18 +66,19 @@ export class ApiService<
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape
 
-> extends Service<
-	TEvents, TStages, TGlobals, TModules, TTranslations
 > {
 
+	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
 	/**
 	 * Constructor.
 	 *
 	 * @param ctx - Global execution context
 	 */
-	constructor(protected readonly ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>) {
-		super(ctx);
+	constructor(ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>) {
+		this._ctx = ctx;
 	}
+
+	public init: () => Promise<void> = async (): Promise<void> => { };
 
 	// -----------------------------------------------------
 	// STAGE API
@@ -92,7 +94,7 @@ export class ApiService<
 	public setBuiltinStageDefaults: StagesDefaultHookMethod<
 		TEvents, TStages, TGlobals, TModules, TTranslations
 	> = (defaults) => {
-		return this.ctx.stages.overrideDefaultStage(defaults);
+		return this._ctx.stages.overrideDefaultStage(defaults);
 	};
 
 	/**
@@ -106,7 +108,7 @@ export class ApiService<
 	public onBuiltinStage: StagesBuiltinHookMethod<
 		TEvents, TStages, TGlobals, TModules, TTranslations
 	> = (stage, hook) => {
-		return this.ctx.stages.registerBuiltinStageHook(stage, hook);
+		return this._ctx.stages.registerBuiltinStageHook(stage, hook);
 	}
 
 	/**
@@ -120,7 +122,7 @@ export class ApiService<
 	public onCustomStage: StagesCustomHookMethod<
 		TEvents, TStages, TGlobals, TModules, TTranslations
 	> = (stage, hook) => {
-		return this.ctx.stages.registerCustomStageHook(stage, hook);
+		return this._ctx.stages.registerCustomStageHook(stage, hook);
 	}
 
 	// -----------------------------------------------------
@@ -137,7 +139,7 @@ export class ApiService<
 	public onGlobals: GlobalsHookMethod<
 		TEvents, TStages, TGlobals, TModules, TTranslations
 	> = (hook) => {
-		return this.ctx.globals.customHook(hook);
+		return this._ctx.globals.customHook(hook);
 	}
 
 	// -----------------------------------------------------
@@ -155,7 +157,7 @@ export class ApiService<
 	public onModule: ModulesHookMethod<
 		TEvents, TStages, TGlobals, TModules, TTranslations
 	> = (module, hook) => {
-		return this.ctx.modules.registerCustomModuleHook(module, hook);
+		return this._ctx.modules.registerCustomModuleHook(module, hook);
 	};
 
 	/**
@@ -170,7 +172,7 @@ export class ApiService<
 	public onModuleAction: ModulesActionHookMethod<
 		TEvents, TStages, TGlobals, TModules, TTranslations
 	> = (module, action, hook) => {
-		return this.ctx.modules.registerCustomActionHook(module, action, hook);
+		return this._ctx.modules.registerCustomActionHook(module, action, hook);
 	};
 
 	// -----------------------------------------------------
