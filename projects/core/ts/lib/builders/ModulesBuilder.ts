@@ -1,4 +1,3 @@
-// TODO: V0.1 — CORE_STATES integration may impact module resolution lifecycle
 // NOTE:
 // - Builders perform minimal validation only
 // - Full validation (actions structure, flags, indexing, etc.) is handled by ModulesManager
@@ -16,6 +15,12 @@ import { CoreError } from "@helpers";
  *
  * Merges built-in modules with user-defined modules.
  *
+ * Lifecycle position:
+ * - executed during `CLI.init()` static bootstrap
+ * - runs before managers exist
+ * - cannot rely on the core event system yet
+ * - therefore reports failures through `CoreError` only
+ *
  * Responsibilities:
  * - Prevent override of reserved built-in modules ("help", "version")
  * - Perform shallow merge
@@ -27,6 +32,10 @@ import { CoreError } from "@helpers";
  * - No runtime guarantees
  *
  * These are handled later by ModulesManager.
+ *
+ * Architectural note:
+ * - this builder is expected to disappear with RFC-0002 once validation/indexing
+ *   fully moves into manager initialization
  *
  * @template TCustomModules - Custom modules shape
  * @param custom - Optional custom modules definition
@@ -57,8 +66,7 @@ export function buildModules<
 		for (const key in custom) {
 			if (key === "help" || key === "version") {
 				throw new CoreError(
-					"MODULE_RESERVED",
-					"ModulesBuilder.buildModules",
+					"modulesNamespace",
 					`Module "${key}" is reserved and cannot be overridden`
 				);
 			}

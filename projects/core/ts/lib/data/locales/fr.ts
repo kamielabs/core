@@ -1,69 +1,60 @@
 import { CoreMessagesShape } from "@types";
 
+/**
+ * Builtin French message dictionary.
+ *
+ * Current role:
+ * - secondary builtin locale derived from the English reference dictionary
+ *
+ * Forward-compat note:
+ * - message `code` values are expected to become event `name` references
+ * - they must stay aligned with builtin events declared as `kind: message`
+ */
 export const BUILTIN_FR_MESSAGES = {
 	parserInit: {
-		code: 'CORE_EVENT_PARSER_INIT',
-		title: 'Initialisation du Parser',
-		description: ''
+		code: 'CORE_PARSER_INIT',
+		content: 'Initialisation du parser'
 	},
-	parsingDone: {
-		code: 'CORE_EVENT_PARSING_DONE',
-		title: 'Parser Prêt !',
-		description: '',
+	parserInvalidPhase: {
+		code: 'CORE_PARSER_INVALID_PHASE',
+		content: 'Phase du parser invalide !',
 	},
-	parserFatal: {
-		code: "CORE_EVENT_PARSER_FATAL",
-		title: 'Erreur Fatale du parser !',
-		description: '',
+	parserReady: {
+		code: 'CORE_PARSER_READY',
+		content: 'Parser prêt !'
+	},
+	stageReady: {
+		code: 'CORE_STAGE_READY',
+		content: 'Stage {stage} prêt !'
 	},
 	globalsInit: {
-		code: "CORE_EVENT_GLOBALS_INIT",
-		title: "Initialisation du Gestionnaire de drapeaux globaux du CLI",
-		description: "",
+		code: "CORE_GLOBALS_INIT",
+		content: "Initialisation du gestionnaire des options globales"
 	},
 	globalsHooking: {
-		code: "CORE_EVENT_GLOBALS_HOOKING",
-		title: "Global Options Hooking",
-		description: ''
+		code: "CORE_GLOBALS_HOOKING",
+		content: "Application des hooks des options globales"
 	},
 	globalsReady: {
-		code: "CORE_EVENT_GLOBALS_READY",
-		title: "Global Flas Manager Ready",
-		description: "global flags parsing done"
-	},
-	globalsFatal: {
-		code: "CORE_EVENT_GLOBALS_FATAL",
-		title: "Globals Flags Manager Fatal Error",
-		description: ""
+		code: "CORE_GLOBALS_READY",
+		title: "Gestionnaire des options globales prêt",
+		description: 'Options globales :\n{globals}'
 	},
 	modulesInit: {
-		code: "CORE_EVENT_MODULES_INIT",
-		title: "Module Parsing Init",
-		description: ""
+		code: "CORE_MODULES_INIT",
+		content: "Initialisation du parsing des modules"
+	},
+	modulesHooking: {
+		code: "CORE_MODULES_HOOKING",
+		content: "Application des hooks des options de module"
 	},
 	modulesReady: {
-		code: "CORE_EVENT_MODULES_READY",
-		title: "Module Parsing Ready",
-		description: ""
-	},
-	modulesFatal: {
-		code: "CORE_EVENT_MODULES_FATAL",
-		title: "Module Parsing Fatal Error",
-		description: ""
-	},
-	actionInit: {
-		code: "CORE_EVENT_ACTION_INIT",
-		title: "Action Init",
-		description: ""
-	},
-	actionReady: {
-		code: "CORE_EVENT_ACTION_READY",
-		title: "Action ready to be executed",
+		code: "CORE_MODULES_READY",
+		title: "Parsing des modules prêt",
 		description: ""
 	},
 	runtimeReady: {
-		code: "CORE_EVENT_RUNTIME_READY",
-		title: "Runtime fully resolved, enjoy !",
-		description: ""
+		code: "CORE_RUNTIME_READY",
+		content: "Runtime entièrement prêt, profitez-en !"
 	}
-} satisfies CoreMessagesShape
+} as const satisfies CoreMessagesShape;

@@ -22,8 +22,20 @@ import {
 	RuntimeGlobalsFacts,
 	RuntimeStageFacts
 } from "@types";
-import { SnapshotFullContext } from "./20-SnapshotContext";
-import { EmitMessageHookMethod, EmitSignalHookMethod, SetOutputListenerMethod } from "./10-EventsContext";
+import {
+	SnapshotFullContext,
+	SetOutputListenerMethod,
+	SignalTraceHookMethod,
+	SignalDebugHookMethod,
+	SignalInfoHookMethod,
+	SignalWarnHookMethod,
+	SignalThrowHookMethod,
+	MessageTraceHookMethod,
+	MessageDebugHookMethod,
+	MessageInfoHookMethod,
+	MessageWarnHookMethod,
+	MessageThrowHookMethod
+} from "@contexts";
 
 /**
  * GlobalsHookMethod
@@ -81,21 +93,33 @@ export type ToolsGlobalsContext<
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape
 > = {
-	/**
+
+	/*
 	 * Emit a signal event.
 	 */
-	signal: EmitSignalHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-
+	signal: {
+		trace: SignalTraceHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		debug: SignalDebugHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		info: SignalInfoHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		warn: SignalWarnHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		throw: SignalThrowHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	};
 	/**
 	 * Emit a user-facing message.
 	 */
-	message: EmitMessageHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-
+	message: {
+		trace: MessageTraceHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		debug: MessageDebugHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		info: MessageInfoHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		warn: MessageWarnHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		throw: MessageThrowHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	};
 	/**
 	 * Register an output listener.
 	 *
 	 * WARNING:
 	 * - Impacts global output behavior
+	 * - Registers passive output listeners only, never flow listeners
 	 */
 	addListener: SetOutputListenerMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
 }
@@ -149,6 +173,7 @@ export type GlobalsHookContext<
  * - global options resolution
  * - environment variable parsing
  * - CLI flag parsing
+ * - before runtime globals are frozen as the final resolved snapshot
  *
  * Notes:
  * - Can be sync or async

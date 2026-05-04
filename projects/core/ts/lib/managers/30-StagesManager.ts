@@ -1,13 +1,9 @@
 import fs from "fs";
-import { ResolverManagerWithDict } from "@abstracts";
 import {
 	Context,
 	StageHook
 } from "@contexts";
 import { FinalStages } from "@data";
-import {
-	CoreError
-} from "@helpers";
 import {
 	BuiltinStageKey,
 	BuiltinStageOptions,
@@ -58,6 +54,12 @@ import {
  * - Execute optional user-defined hook
  * - Produce immutable RuntimeStageFacts
  *
+ * Runtime role:
+ * - Stages define pre-runtime configuration
+ * - They provide baseline runtime settings such as `lang` and `workingDir`
+ * - They may also expose pre-runtime ENV-driven switches so the frozen runtime
+ *   can adapt before globals, i18n, parser, and modules resolution
+ *
  * Design principles:
  * - Runtime is the single source of truth
  * - Draft → resolve → freeze lifecycle
@@ -76,12 +78,12 @@ export class StagesManager<
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape
-> extends ResolverManagerWithDict<
-	CoreStagesShapeDecl<TStages>,
-	RuntimeStageFacts,
-	TEvents, TStages, TGlobals, TModules, TTranslations
 > {
 
+	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private _dict: CoreStagesShapeDecl<TStages>;
+	private _draft?: RuntimeStageFacts | undefined;
+	private _resolved?: RuntimeStageFacts;
 	/**
 	 * Stored overrides for builtin default stage.
 	 *
@@ -129,20 +131,87 @@ export class StagesManager<
 	 * @param stageDict - Fully resolved stage definitions
 	 */
 	constructor(
-		protected readonly ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>,
-		stageDict: FinalStages<TStages>
+		ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>,
+		stages: FinalStages<TStages>
 	) {
-		super(
-			ctx,
-			{
-				stages: stageDict,
-				envIndex: { byStage: {} },
-				stageIndex: { byName: {} }
-			}
-		);
+		this._ctx = ctx;
+		this._dict = {
+			stages,
+			envIndex: { byStage: {} },
+			stageIndex: { byName: {} }
+		};
 
 		// Build all lookup indexes once at construction
+		// this._resolveIndexes();
+		// this._freezeDict();
+	}
+
+	public init: () => Promise<void> = async (): Promise<void> => {
 		this._resolveIndexes();
+		this._freezeDict();
+	}
+
+	/**
+	 * Freeze the declaration dictionary once stage lookup indexes are prepared.
+	 */
+	private _freezeDict() {
+		this._dict = this._ctx.helpers.core.deepFreeze(this._dict);
+	}
+
+	/**
+	 * Store the mutable runtime stage draft before final freezing.
+	 */
+	private _setDraft(state: RuntimeStageFacts) {
+		this._draft = state;
+	}
+
+	/**
+	 * Clear the mutable runtime stage draft once resolution is finalized.
+	 */
+	private _clearDraft() {
+		this._draft = undefined;
+	}
+
+	/**
+	 * Freeze and persist the final immutable runtime stage facts.
+	 */
+	private _setResolved(state: RuntimeStageFacts): void | never {
+		if (this._resolved) {
+			this._ctx.events.throw('stagesAlreadyResolved');
+		}
+		this._resolved = this._ctx.helpers.core.deepClone(state);
+		this._resolved = this._ctx.helpers.core.deepFreeze(this._resolved);
+	}
+
+	public getDict(): CoreStagesShapeDecl<TStages> {
+		return this._dict;
+	}
+
+	/**
+	 * Return the current mutable runtime stage draft.
+	 */
+	public getDraft(): RuntimeStageFacts {
+		if (!this._draft) {
+			this._ctx.events.throw('stagesMissingDraft');
+		}
+		return this._draft;
+	}
+
+	/**
+	 * Return the final immutable runtime stage facts.
+	 */
+	public getResolved(): RuntimeStageFacts {
+		if (!this._resolved) {
+			this._ctx.events.throw('stagesMissingResolved');
+		}
+		return this._resolved!;
+	}
+
+	/**
+	 * Indicates if state is resolved.
+	 */
+	public isResolved(): boolean {
+		return !!this._resolved;
 	}
 
 	/**
@@ -155,7 +224,6 @@ export class StagesManager<
 	 * Also validates:
 	 * - uniqueness of ENV keys per stage
 	 *
-	 * @throws CoreError if duplicate ENV key is detected
 	 */
 	private _resolveIndexes() {
 		const stages = this._dict.stages;
@@ -165,9 +233,7 @@ export class StagesManager<
 			if (!stage) continue;
 
 			this._dict.stageIndex.byName[stageName] = stage;
-
-			for (const optionName in stage.options) {
-				const opt = stage.options[optionName];
+			for (const [optionName, opt] of Object.entries(stage.options)) {
 				if (!opt) continue;
 
 				const envKey = opt.env;
@@ -175,12 +241,9 @@ export class StagesManager<
 
 				if (this._dict.envIndex.byStage[stageName]?.byEnv[envKey]) {
 					const existing = this._dict.envIndex.byStage[stageName].byEnv[envKey];
-
-					throw new CoreError(
-						"STAGE_ENV_DUPLICATE",
-						"Stages",
-						`Duplicate ENV key "${envKey}" detected in stage "${existing.stageName}" (option "${existing.optionName}")`
-					);
+					this._ctx.events.throw('stageDuplicateEnv', {
+						details: [`Env Key: ${envKey}`, `Stage: ${existing.stageName}`, `Option: ${existing.optionName}`]
+					});
 				}
 
 				this._dict.envIndex.byStage[stageName] ??= { byEnv: {} };
@@ -199,6 +262,9 @@ export class StagesManager<
 	 * Resolution priority:
 	 * DEFAULT < ENV_FILE < ENV_VAR
 	 *
+	 * Stage options are pre-runtime only: their resolved values become the
+	 * baseline consumed later by the runtime services and managers.
+	 *
 	 * @param opt - Stage option definition
 	 * @param envVars - process.env
 	 * @param fileEnv - parsed .env file
@@ -215,11 +281,11 @@ export class StagesManager<
 		let value = defaultValue;
 
 		if (envKey && fileEnv[envKey] !== undefined) {
-			value = this.ctx.helpers.core.castEnvValue(fileEnv[envKey], defaultValue);
+			value = this._ctx.helpers.core.castEnvValue(fileEnv[envKey], defaultValue);
 		}
 
 		if (envKey && envVars[envKey] !== undefined) {
-			value = this.ctx.helpers.core.castEnvValue(envVars[envKey] as string, defaultValue);
+			value = this._ctx.helpers.core.castEnvValue(envVars[envKey] as string, defaultValue);
 		}
 
 		return value;
@@ -234,17 +300,16 @@ export class StagesManager<
 		const values = this._builtinStageDefaults;
 		if (!values) return;
 
-		const draft = this.getDraft();
 
 		if (values.file !== undefined) {
-			draft.file = values.file;
+			this.getDraft().file = values.file;
 		}
 
 		if (values.options) {
 			for (const key of Object.keys(values.options) as Array<keyof typeof values.options>) {
 				const value = values.options[key];
 				if (value !== undefined) {
-					(draft.options as Record<string, ParsedOptionValue>)[key] = value;
+					(this.getDraft().options as Record<string, ParsedOptionValue>)[key] = value;
 				}
 			}
 		}
@@ -323,8 +388,8 @@ export class StagesManager<
 	 * Core invariant hook (always executed).
 	 *
 	 * Validates:
-	 * - lang: required non-empty string
-	 * - workingDir: if provided, must exist
+	 * - `lang`: required non-empty string for runtime i18n selection
+	 * - `workingDir`: if provided, must exist before runtime starts
 	 *
 	 * Emits internal events on failure.
 	 *
@@ -333,20 +398,17 @@ export class StagesManager<
 	private async _coreStageHook(
 		options: Record<string, ParsedOptionValue>
 	) {
-		const events = this.ctx.events;
 
 		const lang = options.lang;
 		const workingDir = options.workingDir;
 
 		if (!lang || typeof lang !== 'string' || lang.trim() === '') {
-			await events.internalEmit('stageLangError');
-			return;
+			this._ctx.events.throw('stageMissingLang', { details: [`Lang: ${lang}`] });
 		}
 
 		if (workingDir) {
 			if (typeof workingDir !== 'string' || !fs.existsSync(workingDir)) {
-				await events.internalEmit('stageWorkingDirError');
-				return;
+				this._ctx.events.throw('stageMissingWorkingDir', { details: [`Path: ${workingDir}`] });
 			}
 		}
 	}
@@ -364,12 +426,15 @@ export class StagesManager<
 	 * 7. Execute user hook (if any)
 	 * 8. Freeze and finalize runtime facts
 	 *
+	 * This is the last pre-runtime configuration step before globals and the
+	 * rest of the runtime pipeline build on top of the selected stage facts.
+	 *
 	 * @returns Promise<void>
 	 */
 	public async resolve(): Promise<void> {
 
 		const rawStage = process.env._NODE_CLI_STAGE;
-		const defaultStageName = this.ctx.settings.defaultStageName ?? 'default';
+		const defaultStageName = this._ctx.settings.defaultStageName ?? 'default';
 
 		const stageName =
 			!rawStage || rawStage === defaultStageName
@@ -378,17 +443,15 @@ export class StagesManager<
 
 		const stage = this._dict.stageIndex.byName[stageName];
 		if (!stage) {
-			this.ctx.events.internalEmit('stageNotFound')
-			return;
+			this._ctx.events.throw('stageMissing', { details: [`Name: ${stageName}`] })
 		}
 
-		if (!stage.file) {
-			this.ctx.events.internalEmit('stageFileNotFound');
-			return;
+		if (typeof stage.file !== 'string') {
+			this._ctx.events.throw('stageMissingFile', { details: [`StageFile: ${stage.file}`] });
 		}
 
 		const envVars = process.env as Record<string, string | undefined>;
-		const fileEnv = this.ctx.helpers.core.loadEnvFile(stage.file);
+		const fileEnv = this._ctx.helpers.core.loadEnvFile(stage.file);
 
 		const resolvedOptions: Record<string, ParsedOptionValue> = {};
 
@@ -405,14 +468,14 @@ export class StagesManager<
 			options: resolvedOptions
 		};
 
-		this.setDraft(facts);
+		this._setDraft(facts);
 
 		// Apply defaults only for builtin stage
 		if (Object.hasOwn(this._builtinStageHooks, stageName)) {
 			this._applyBuiltinStageDefaults();
 		}
 
-		this.ctx.events.internalEmit('stageHooking');
+		await this._ctx.events.emit('stageHooking');
 
 		await this._coreStageHook(this.getDraft().options);
 
@@ -421,15 +484,14 @@ export class StagesManager<
 		if (hook) {
 			await hook({
 				options: this.getDraft().options,
-				tools: this.ctx.tools.stageContext(),
-				runtime: this.ctx.runtime.stageContext(),
-				snapshot: this.ctx.snapshot.snapshotContext()
+				tools: this._ctx.tools.stageContext(),
+				runtime: this._ctx.runtime.stageContext(),
+				snapshot: this._ctx.snapshot.snapshotContext()
 			});
 		}
 
-		this.freezeDict();
 
-		this.setResolved(this.getDraft());
-		this.clearDraft();
+		this._setResolved(this.getDraft());
+		this._clearDraft();
 	}
 }

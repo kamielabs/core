@@ -1,5 +1,3 @@
-import { ResolverManagerWithDict } from "@abstracts";
-
 import {
 	Context,
 	ActionHook,
@@ -37,7 +35,6 @@ import {
 import { BUILTIN_MODULES, FinalModules } from "@data";
 
 import {
-	CoreError,
 	ModulesHelpers
 } from "@helpers";
 
@@ -58,36 +55,38 @@ import { helpShow, versionShow } from "@data/modules";
  *
  * Central runtime resolver for modules and actions.
  *
- * Responsibilities:
- * - Build module/action indexes (names, aliases, flags)
- * - Validate module structure (actions vs defaultAction vs singleAction)
- * - Resolve runtime module/action from parsed CLI context
- * - Handle builtin overrides (help/version)
- * - Execute module-level hooks (pre-action)
- * - Provide action runner execution entrypoint
+	 * Responsibilities:
+	 * - Build module/action indexes (names, aliases, flags)
+	 * - Validate module structure (actions vs defaultAction vs singleAction)
+	 * - Resolve runtime module/action from parser state and parsed CLI context
+	 * - Handle builtin overrides (help/version)
+	 * - Execute module-level hooks (pre-action)
+	 * - Provide the action runner execution entrypoint used by engines
  *
- * Position in lifecycle:
- * - Executes AFTER globals resolution
- * - Consumes ParserManager output
- * - Produces RuntimeModuleFacts
- * - Delegates final execution to action hooks (userland)
+	 * Position in lifecycle:
+	 * - Executes AFTER globals resolution
+	 * - Consumes ParserManager state and output
+	 * - Produces RuntimeModuleFacts
+	 * - Delegates final execution to action hooks (userland)
  *
- * Core concepts:
- * - Modules define execution domains
- * - Actions define executable units
- * - Flags are scoped (module vs action)
- * - Runtime resolution is deterministic and immutable after freeze
+	 * Core concepts:
+	 * - Modules define execution domains
+	 * - Actions define executable units
+	 * - Flags are scoped (module vs action)
+	 * - Parsing is left-to-right only, with no rewind/backtracking
+	 * - Runtime resolution is deterministic and immutable after freeze
  *
- * Execution model:
- * - Resolve runtime → determine module/action
- * - Execute optional module hook
- * - Runner executes action hook
- * - Core stops here → userland takes control
+	 * Execution model:
+	 * - Resolve runtime → determine moduleName/moduleFlags/actionName/actionFlags/args
+	 * - Execute optional module hook
+	 * - Runner executes action hook
+	 * - Core stops here → userland takes control
  *
- * Special behaviors:
- * - Builtin override via globals (help/version)
- * - Single module mode (__defaultModule__)
- * - Fallback to help on parser issues
+	 * Special behaviors:
+	 * - Builtin override via globals (help/version)
+	 * - Single module mode (__defaultModule__)
+	 * - Fallback to help on parser issues
+	 * - Encodes defaultAction vs singleAction vs explicit actions semantics
  *
  * Design principles:
  * - Strict separation between resolution and execution
@@ -107,15 +106,13 @@ export class ModulesManager<
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape
-> extends ResolverManagerWithDict<
-	CoreModulesShapeDecl<TModules>,
-	RuntimeModuleFacts,
-	TEvents,
-	TStages,
-	TGlobals,
-	TModules,
-	TTranslations
 > {
+
+	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private _dict: CoreModulesShapeDecl<TModules>;
+	private _draft?: RuntimeModuleFacts | undefined;
+	private _resolved?: RuntimeModuleFacts;
+
 
 	/**
 	 * Builtin module hooks registry.
@@ -164,36 +161,131 @@ export class ModulesManager<
 	/**
 	 * Constructor.
 	 *
-	 * Initializes module dictionary and builds:
-	 * - module index (name + alias)
-	 * - action index (per module)
-	 * - flag index (module + action)
+	 * Initializes the mutable module declaration container.
 	 *
-	 * Also registers builtin actions (help/version).
+	 * Actual index building and builtin action registration are deferred to `init()`
+	 * so the manager stays consistent with the rest of the core initialization flow.
 	 *
 	 * @param ctx - Global execution context
 	 * @param modulesDict - Final modules declaration
 	 */
 	constructor(
-		protected readonly ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>,
-		modulesDict: FinalModules<TModules>
+		ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>,
+		modules: FinalModules<TModules>
 	) {
 
-		super(
-			ctx,
-			{
-				modules: modulesDict,
-				moduleIndex: { byName: {}, byAlias: {} },
-				actionIndex: { byModule: {} },
-				flagIndex: { module: {}, action: {} }
-			} satisfies CoreModulesShapeDecl<TModules>
-		);
+		this._ctx = ctx;
+		this._dict = {
+			modules,
+			moduleIndex: { byName: {}, byAlias: {} },
+			actionIndex: { byModule: {} },
+			flagIndex: { module: {}, action: {} }
+		} satisfies CoreModulesShapeDecl<TModules>;
 
+	}
+
+	/**
+	 * Finalize declaration-time preparation for the modules brick.
+	 *
+	 * This phase:
+	 * - builds all lookup indexes used at runtime
+	 * - registers builtin action hooks owned by the core
+	 * - freezes the declaration dictionary once preparation is complete
+	 *
+	 * It must run exactly once during core initialization before any runtime
+	 * module/action resolution is attempted.
+	 */
+	public init: () => Promise<void> = async (): Promise<void> => {
 		this._resolveIndexes();
 
 		// Register builtin actions
 		this._registerBuiltinActionHook('help', 'show', helpShow());
 		this._registerBuiltinActionHook('version', 'show', versionShow());
+
+		this._freezeDict();
+	};
+
+	/**
+	 * Freeze the internal declaration dictionary once indexes and builtins are ready.
+	 */
+	private _freezeDict() {
+		this._dict = this._ctx.helpers.core.deepFreeze(this._dict);
+	}
+
+	/**
+	 * Return a read-only snapshot of the full module declaration dictionary.
+	 *
+	 * A defensive clone is returned to preserve manager encapsulation.
+	 */
+	public getDict(): Readonly<CoreModulesShapeDecl<TModules>> {
+		const dict = this._ctx.helpers.core.deepClone(this._dict);
+		this._ctx.helpers.core.deepFreeze(dict)
+		return dict;
+	}
+
+	/**
+	 * Store the mutable runtime module draft before final freezing.
+	 *
+	 * The draft represents the transient resolution state used between
+	 * `_resolveRuntime()` and `_setResolved()`.
+	 */
+	private _setDraft(state: RuntimeModuleFacts) {
+		this._draft = state;
+	}
+
+	/**
+	 * Return the current mutable runtime draft.
+	 *
+	 * This state only exists during module resolution, before the final
+	 * runtime facts are frozen.
+	 */
+	public getDraft(): RuntimeModuleFacts {
+		if (!this._draft) {
+			this._ctx.events.throw('modulesMissingDraft');
+		}
+		return this._draft;
+	}
+
+
+	/**
+	 * Clear the mutable runtime draft once resolution has completed.
+	 */
+	private _clearDraft() {
+		this._draft = undefined;
+	}
+
+	/**
+	 * Freeze and persist the final runtime module facts.
+	 *
+	 * Once stored, module runtime facts become immutable and define the single
+	 * source of truth consumed later by the selected engine and action runner.
+	 */
+	private _setResolved(state: RuntimeModuleFacts): void | never {
+		if (this._resolved) {
+			this._ctx.events.throw('modulesAlreadyResolved');
+		}
+		this._resolved = this._ctx.helpers.core.deepClone(state);
+		this._resolved = this._ctx.helpers.core.deepFreeze(this._resolved);
+	}
+
+	/**
+	 * Return the final immutable runtime module facts.
+	 *
+	 * This is the post-resolution snapshot consumed by the runner and by any
+	 * runtime surface that needs the selected module/action tuple.
+	 */
+	public getResolved(): RuntimeModuleFacts {
+		if (!this._resolved) {
+			this._ctx.events.throw('modulesMissingResolved');
+		}
+		return this._resolved;
+	}
+
+	/**
+	 * Indicates if state is resolved.
+	 */
+	public isResolved(): boolean {
+		return !!this._resolved;
 	}
 
 	// -----------------------------------------------------
@@ -218,9 +310,11 @@ export class ModulesManager<
 	 * Validation:
 	 * - "__defaultModule__" cannot coexist with other modules
 	 *
-	 * @throws CoreError on invalid module configuration
+	 * This step is purely declarative:
+	 * it prepares lookup structures used later by parser-driven runtime resolution.
+	 *
 	 */
-	private _resolveIndexes(): void {
+	private _resolveIndexes() {
 		const modules = this._getModuleEntries();
 
 		const customModules = modules.filter(([name]) => !(name in BUILTIN_MODULES));
@@ -228,11 +322,7 @@ export class ModulesManager<
 		const hasDefaultModule = customModules.some(([name]) => name === "__defaultModule__");
 
 		if (hasDefaultModule && customModules.length > 1) {
-			throw new CoreError(
-				'SINGLE_VS_MODULES_CONFLICT',
-				'ModulesManager',
-				`Invalid modules declaration: "__defaultModule__" cannot coexist with named modules`
-			);
+			this._ctx.events.throw('modulesConflictModule');
 		}
 
 		for (const [moduleName, module] of modules) {
@@ -280,10 +370,8 @@ export class ModulesManager<
 
 	/**
 	 * Validate that module defines only one action container.
-	 *
-	 * @throws CoreError if multiple containers are defined
 	 */
-	private _validateActionContainer(moduleName: string, module: ModuleInfos): void {
+	private _validateActionContainer(moduleName: string, module: ModuleInfos): void | never {
 		const hasActions = "actions" in module && !!module.actions;
 		const hasDefaultAction = "defaultAction" in module && !!module.defaultAction;
 		const hasSingleAction = "singleAction" in module && !!module.singleAction;
@@ -294,11 +382,11 @@ export class ModulesManager<
 			Number(hasSingleAction);
 
 		if (count > 1) {
-			throw new CoreError(
-				'ACTIONS_VS_DEFAULT_VS_SINGLE_CONFLICT',
-				'ModulesManager',
-				`Invalid module "${moduleName}": only one of "actions", "defaultAction" or "singleAction" can be defined`
-			);
+			this._ctx.events.throw('modulesConflictAction', {
+				details: [
+					`module: ${moduleName}`
+				]
+			});
 		}
 	}
 
@@ -313,6 +401,11 @@ export class ModulesManager<
 	 * - action name resolution
 	 * - alias resolution
 	 * - action flags indexing
+	 *
+	 * The action container may come from:
+	 * - `actions`
+	 * - `defaultAction`
+	 * - `singleAction`
 	 */
 	private _resolveActionIndexes(
 		moduleName: string,
@@ -449,6 +542,8 @@ export class ModulesManager<
 	 * Supports:
 	 * - help
 	 * - version
+	 *
+	 * These overrides short-circuit normal module/action resolution.
 	 */
 	private _resolveBuiltinOverride(globals: RuntimeGlobalsFacts) {
 		if (globals.core?.help) return "help";
@@ -458,6 +553,9 @@ export class ModulesManager<
 
 	/**
 	 * Detect single-module runtime mode.
+	 *
+	 * In this mode the core bypasses explicit module/action resolution and
+	 * routes directly to `__defaultModule__` + `__singleAction__`.
 	 */
 	private _isSingleModuleRuntime(): boolean {
 		return "__defaultModule__" in this._dict.modules;
@@ -467,18 +565,22 @@ export class ModulesManager<
 	 * Resolve runtime module/action facts.
 	 *
 	 * Steps:
-	 * - Compute runtime (module + action + options)
+	 * - Compute runtime (module + action + options + args)
 	 * - Execute module hook (if any)
 	 * - Freeze and finalize
+	 *
+	 * This method only builds module facts. Final action execution remains
+	 * deferred to `runner()`, which is called later by the selected engine.
 	 */
 	public async resolve(): Promise<void> {
-		const runtime = this._resolveRuntime();
-		this.setDraft(runtime);
+		const draft = this._resolveRuntime();
+		this._setDraft(draft);
 
-		await this._executeModuleHook(runtime);
 
-		this.freezeDict();
-		this.setResolved(runtime);
+		await this._executeModuleHook(draft);
+
+		this._setResolved(this._ctx.helpers.core.deepClone(draft));
+		this._clearDraft();
 	}
 
 	// -----------------------------------------------------
@@ -492,18 +594,30 @@ export class ModulesManager<
 	 * - builtin overrides (help/version)
 	 * - single module mode
 	 * - full module/action parsing
+	 *
+	 * Parsing behavior:
+	 * - consumes the parser progressively
+	 * - relies on left-to-right state progression only
+	 * - never rewinds or replays tokens
+	 *
+	 * Resolution order:
+	 * - builtin global override
+	 * - single-module shortcut
+	 * - standard parser-driven module/action resolution
 	 */
 	private _resolveRuntime(): RuntimeModuleFacts {
-		const parser = this.ctx.parser;
+		const parser = this._ctx.parser;
 		const dict = this.getDict();
 
 		const moduleFlags = this._dict.flagIndex.module;
 		const actionFlags = this._dict.flagIndex.action;
 
-		const overrideAction = this._resolveBuiltinOverride(this.ctx.globals.getResolved());
+
+		const overrideAction = this._resolveBuiltinOverride(this._ctx.globals.getResolved()!);
 
 		if (overrideAction) {
 			parser.finalizeArgsPhase();
+
 			const parsed = parser.getContext();
 
 			return overrideAction === "help"
@@ -543,6 +657,7 @@ export class ModulesManager<
 			ModulesHelpers.buildParserFlagIndexFromAction(dict.modules, actionFlags)
 		);
 
+
 		const parsed = parser.getContext();
 
 		return {
@@ -565,39 +680,43 @@ export class ModulesManager<
 	 * - If parser issues exist → fallback to help
 	 * - Resolve corresponding action hook
 	 * - Execute hook with runtime context
+	 * - Centralize the final redirection logic before userland execution
+	 * - Encode help fallback and final action selection semantics in one place
 	 *
 	 * This is the final step of the core.
 	 * After this, execution is fully delegated to userland.
 	 *
-	 * @throws Error if no hook is found
 	 */
-	public async runner() {
-		const issues = this.ctx.parser.getIssues();
+	public runner: () => Promise<void> = async () => {
+		const issues = this._ctx.parser.getIssues();
 
 		let moduleName: string;
 		let actionName: string;
 		let hook: ActionHook<TEvents, TStages, TGlobals, TModules, TTranslations> | undefined;
 
+		const resolved = this._ctx.modules.getResolved();
 		if (issues.length > 0) {
 			moduleName = "help";
 			actionName = "show";
-			hook = this.ctx.modules.getActionHook('help', 'show');
+			hook = this._ctx.modules.getActionHook(moduleName, actionName);
 		} else {
-			const resolved = this.ctx.modules.getResolved();
 			moduleName = resolved.moduleName;
 			actionName = resolved.actionName;
-			hook = this.ctx.modules.getActionHook(moduleName, actionName);
+			hook = this._ctx.modules.getActionHook(moduleName, actionName);
 		}
 
+
 		if (!hook) {
-			throw new Error(`Missing hook for ${moduleName}.${actionName}`);
+			this._ctx.events.throw('modulesMissingActionHook', {
+				values: { module: moduleName, action: actionName }
+			});
 		}
 
 		await hook({
-			options: this.ctx.modules.getResolved().actionOptions,
-			runtime: this.ctx.runtime.actionContext(),
-			tools: this.ctx.tools.actionContext(),
-			snapshot: this.ctx.snapshot.snapshotContext(),
+			options: resolved.actionOptions,
+			runtime: this._ctx.runtime.actionContext(),
+			tools: this._ctx.tools.actionContext(),
+			snapshot: this._ctx.snapshot.snapshotContext(),
 		});
 	}
 
@@ -644,7 +763,10 @@ export class ModulesManager<
 	}
 
 	/**
-	 * Retrieve module hook.
+	 * Retrieve module hook for a resolved module name.
+	 *
+	 * Builtin hooks take precedence over custom ones when both registries
+	 * expose the same module key.
 	 */
 	public getModuleHook(
 		module: string
@@ -678,16 +800,20 @@ export class ModulesManager<
 
 	/**
 	 * Execute module hook if defined.
+	 *
+	 * Module hooks run after runtime resolution and before the final action runner.
 	 */
 	private async _executeModuleHook(runtime: RuntimeModuleFacts) {
 		const hook = this.getModuleHook(runtime.moduleName);
 
 		if (!hook) return;
 
+		await this._ctx.events.emit('modulesHooking');
+
 		await hook({
-			runtime: this.ctx.runtime.moduleContext(),
-			tools: this.ctx.tools.moduleContext(),
-			snapshot: this.ctx.snapshot.snapshotContext(),
+			runtime: this._ctx.runtime.moduleContext(),
+			tools: this._ctx.tools.moduleContext(),
+			snapshot: this._ctx.snapshot.snapshotContext(),
 			options: runtime.moduleOptions
 		});
 	}
@@ -697,7 +823,10 @@ export class ModulesManager<
 	// -----------------------------------------------------
 
 	/**
-	 * Register builtin action hook.
+	 * Register builtin action hook owned by the core.
+	 *
+	 * These hooks are wired during `init()` and back the core builtin modules
+	 * such as `help` and `version`.
 	 */
 	private _registerBuiltinActionHook<
 		M extends BuiltinModuleKey<TModules>,
@@ -720,6 +849,9 @@ export class ModulesManager<
 
 	/**
 	 * Register custom action hook.
+	 *
+	 * Custom hooks provide the final userland execution entrypoint selected by
+	 * the runtime module/action resolution pipeline.
 	 */
 	public registerCustomActionHook<
 		M extends CustomModuleKey<TModules>,
@@ -741,7 +873,10 @@ export class ModulesManager<
 	}
 
 	/**
-	 * Retrieve action hook.
+	 * Retrieve action hook for a module/action pair.
+	 *
+	 * Builtin hooks take precedence over custom ones when both registries
+	 * expose the same module/action tuple.
 	 */
 	public getActionHook(
 		module: string,

@@ -11,16 +11,13 @@
 // Currently only CoreHelpers is context-bound due to providers dependency
 
 import { Context } from "@contexts";
-import { BuiltinEvents } from "@data";
 import {
 	CoreEventsShape,
 	CoreGlobalsShape,
 	CoreModulesShape,
 	CoreStagesShape,
-	CoreTranslationsShape,
-	EmitOptionsForKey
+	CoreTranslationsShape
 } from "@types";
-import { CoreError } from "@helpers";
 
 /**
  * CoreHelpers
@@ -28,12 +25,14 @@ import { CoreError } from "@helpers";
  * Context-bound helper utility class.
  *
  * Responsibilities:
- * - Provide safe wrappers around core operations
+ * - Provide reusable low-level core utilities
+ * - Wrap file/runtime operations behind the active context providers
  * - Bridge early-phase and runtime behaviors
  * - Expose utility methods requiring providers or context access
  *
  * Design:
  * - Not static (requires Context access)
+ * - Exposed as `ctx.helpers.core.*`
  * - Used internally by core components
  *
  * @template TEvents
@@ -54,40 +53,39 @@ export class CoreHelpers<
 	>) { };
 
 	/**
-	 * emitOrThrow
+	 * Deep-freeze an object graph in place.
 	 *
-	 * Safe event emission wrapper.
+	 * This helper is used to enforce the core's immutable runtime and
+	 * declaration snapshots once a manager reaches its finalized state.
 	 *
-	 * Behavior:
-	 * - If EventsManager is ready → emit event
-	 * - Otherwise → throw CoreError
-	 *
-	 * Purpose:
-	 * - Bridge early-phase (no events) and runtime-phase (events available)
-	 *
-	 * @param key - Built-in event key
-	 * @param options - Event payload
-	 * @param fallback - Fallback error metadata if event system is unavailable
-	 *
-	 * @throws CoreError if events system is not ready
+	 * @param obj - Value to recursively freeze
+	 * @returns The same frozen value
 	 */
-	public emitOrThrow<K extends keyof BuiltinEvents>(
-		key: K,
-		options?: EmitOptionsForKey<BuiltinEvents, K>,
-		fallback?: {
-			source: string
-			desc: string
-		}
-	) {
-		if (this.ctx.ready.events) {
-			return this.ctx.events.internalEmit(key, options);
+	public deepFreeze<T>(obj: T): T {
+		if (!obj || typeof obj !== "object") return obj;
+
+		Object.freeze(obj);
+
+		for (const key of Object.keys(obj as any)) {
+			const value = (obj as any)[key];
+			if (value && typeof value === "object" && !Object.isFrozen(value)) {
+				this.deepFreeze(value);
+			}
 		}
 
-		throw new CoreError(
-			key as string,
-			fallback?.source ?? "unknown",
-			fallback?.desc ?? "Event system not ready"
-		);
+		return obj;
+	}
+
+	/**
+	 * Deep-clone a value using the platform structured clone algorithm.
+	 *
+	 * Used by the core to isolate mutable drafts from resolved/frozen snapshots.
+	 *
+	 * @param obj - Value to clone
+	 * @returns A detached clone of the input value
+	 */
+	public deepClone<T>(obj: T): T {
+		return structuredClone(obj);
 	}
 
 	/**
@@ -103,6 +101,7 @@ export class CoreHelpers<
 	 * Behavior:
 	 * - Normalizes input (trim, quotes removal, lowercase)
 	 * - Returns defaultValue if parsing fails
+	 * - Keeps the default value type as the casting contract
 	 *
 	 * @param value - Raw environment value
 	 * @param defaultValue - Reference value used for type inference
@@ -140,6 +139,7 @@ export class CoreHelpers<
 	 * - Ignores empty lines and comments (#)
 	 * - Parses KEY=VALUE pairs
 	 * - Does not support advanced dotenv features (intentional)
+	 * - Uses the active filesystem provider through the bound context
 	 *
 	 * @param filePath - Path to env file
 	 *
@@ -182,6 +182,9 @@ export class CoreHelpers<
 	 * - Default stage:
 	 *   - If not renamed → "default"
 	 *   - If renamed → "custom(default)"
+	 *
+	 * This is a display helper only: it does not alter the internal runtime
+	 * stage key used by the core.
 	 *
 	 * @param stageName - Internal stage name
 	 * @param defaultName - Optional overridden default name

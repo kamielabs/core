@@ -1,6 +1,5 @@
 // ⚙️ Auto-generated file — DO NOT EDIT
 
-export * from "./00-CoreErrorsBuiltins";
 export * from "./00-EventsBuiltins";
 export * from "./10-LocalesBuiltins";
 export * from "./20-StagesBuiltins";

@@ -4,8 +4,8 @@
 // - Used internally by ModulesManager and ToolsService
 
 // WARNING:
-// - All properties are optional (early lifecycle / partial context scenarios)
-// - Hooks must defensively check availability before usage
+// - Hook payload is currently exposed with optional properties on the public type surface
+// - This reflects the current public API shape
 // - No direct mutation of runtime state is allowed
 
 import {
@@ -21,8 +21,16 @@ import {
 	RuntimeStageFacts
 } from "@types";
 import {
-	EmitMessageHookMethod,
-	EmitSignalHookMethod,
+	MessageDebugHookMethod,
+	MessageInfoHookMethod,
+	MessageThrowHookMethod,
+	MessageTraceHookMethod,
+	MessageWarnHookMethod,
+	SignalDebugHookMethod,
+	SignalInfoHookMethod,
+	SignalThrowHookMethod,
+	SignalTraceHookMethod,
+	SignalWarnHookMethod,
 	SnapshotFullContext
 } from "@contexts";
 import { ModulesManager } from "@managers";
@@ -60,12 +68,24 @@ export type ToolsModuleContext<
 	/**
 	 * Emit a signal event.
 	 */
-	signal: EmitSignalHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	signal: {
+		trace: SignalTraceHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		debug: SignalDebugHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		info: SignalInfoHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		warn: SignalWarnHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		throw: SignalThrowHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	},
 
 	/**
 	 * Emit a user-facing message.
 	 */
-	message: EmitMessageHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	message: {
+		trace: MessageTraceHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		debug: MessageDebugHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		info: MessageInfoHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		warn: MessageWarnHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		throw: MessageThrowHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	}
 }
 
 /**
@@ -92,7 +112,7 @@ export type RuntimeModuleContext = {
  * Definition of a module hook function.
  *
  * Characteristics:
- * - Context properties are optional (depending on lifecycle phase)
+ * - Context properties are currently typed as optional on the public surface
  * - Can be sync or async
  * - Must not mutate runtime directly
  * - Must use provided tools for side-effects

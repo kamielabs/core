@@ -1,4 +1,3 @@
-import { ResolverManagerWithDict } from "@abstracts";
 import { Context } from "@contexts";
 import { FinalTranslations } from "@data";
 import { CoreEventsShape, CoreGlobalsShape, CoreMessage, CoreModulesShape, CoreStagesShape, CoreTranslationsDecl, CoreTranslationsShape, RuntimeI18nFacts } from "@types";
@@ -51,11 +50,12 @@ export class I18nManager<
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape
-> extends ResolverManagerWithDict<
-	CoreTranslationsDecl<FinalTranslations<TTranslations>>,
-	RuntimeI18nFacts,
-	TEvents, TStages, TGlobals, TModules, TTranslations
 > {
+
+	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private _dict: CoreTranslationsDecl<TTranslations>;
+	private _resolved?: RuntimeI18nFacts;
+
 
 	/**
 	 * Constructor.
@@ -66,17 +66,58 @@ export class I18nManager<
 	 * @param translationsDict - Final normalized translations dictionary
 	 */
 	constructor(
-		protected readonly ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>,
-		translationsDict: FinalTranslations<TTranslations>
+		ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>,
+		translations: FinalTranslations<TTranslations>
 	) {
-		super(ctx, {
-			translations: translationsDict,
+		this._ctx = ctx;
+		this._dict = {
+			translations,
 			index: {
 				byCode: {},
 				byLang: {}
 			}
-		});
-		this._resolveIndexes();
+		};
+		// this._resolveIndexes();
+		// this._freezeDict();
+	}
+
+	public init: () => Promise<void> = async (): Promise<void> => {
+		await this._resolveIndexes();
+		this._freezeDict();
+	};
+	private _freezeDict() {
+		this._dict = this._ctx.helpers.core.deepFreeze(this._dict);
+	}
+
+
+	private _setResolved(state: RuntimeI18nFacts): void | never {
+		if (this._resolved) {
+			this._ctx.events.throw('i18nAlreadyResolved');
+		}
+		this._resolved = this._ctx.helpers.core.deepClone(state);
+		this._resolved = this._ctx.helpers.core.deepFreeze(this._resolved);
+	}
+
+	public getDict(): CoreTranslationsDecl<TTranslations> {
+		return this._dict;
+	}
+
+	/**
+	 * Returns resolved state.
+	 *
+	 */
+	public getResolved(): RuntimeI18nFacts {
+		if (!this._resolved) {
+			this._ctx.events.throw('i18nMissingResolved');
+		}
+		return this._resolved;
+	}
+
+	/**
+	 * Indicates if state is resolved.
+	 */
+	public isResolved(): boolean {
+		return !!this._resolved;
 	}
 
 	/**
@@ -94,7 +135,7 @@ export class I18nManager<
 	 * - only defined messages are indexed
 	 * - message.code is treated as the canonical runtime lookup key
 	 */
-	private _resolveIndexes() {
+	private async _resolveIndexes() {
 		const dict = this.getDict().translations;
 
 		const byLang: Record<string, Record<string, CoreMessage<string>>> = {};
@@ -130,18 +171,16 @@ export class I18nManager<
 	 * Resolve runtime i18n facts.
 	 *
 	 * Resolution flow:
-	 * 1. Emit i18nInit
-	 * 2. Resolve active language from stage facts
-	 * 3. Enforce "en" as mandatory fallback dictionary
-	 * 4. Validate non-reference languages against "en"
-	 * 5. Build immutable RuntimeI18nFacts
-	 * 6. Freeze dictionary and mark resolver as ready
-	 * 7. Emit i18nReady
+	 * 1. Resolve active language from stage facts
+	 * 2. Enforce "en" as mandatory fallback dictionary
+	 * 3. Validate non-reference languages against "en"
+	 * 4. Build immutable RuntimeI18nFacts
+	 * 5. Freeze dictionary and mark resolver as ready
 	 *
 	 * Validation semantics:
 	 * - Missing keys in non-"en" languages emit i18nMissingKeys
-	 * - Unknown keys not present in "en" emit i18nUnknownKeys
-	 * - Missing "en" dictionary emits i18nFatal and aborts resolution
+	 * - Unknown keys not present in "en" emit i18nUnknownKeys and stop resolution
+	 * - Missing "en" dictionary emits i18nMissingLang and aborts resolution
 	 *
 	 * Fallback semantics:
 	 * - Active language may be partial
@@ -151,17 +190,17 @@ export class I18nManager<
 	 */
 	public async resolve(): Promise<void> {
 
-		await this.ctx.events.internalEmit("i18nInit");
 
 		const fallback = "en";
-		const lang = this.ctx.stages.getResolved().options.lang as string ?? fallback;
+		const stage = this._ctx.stages.getResolved();
+
+		const lang = stage.options.lang as string ?? fallback;
 
 		const dict = this.getDict().index.byLang;
 
 		const en = dict[fallback];
 		if (!en) {
-			await this.ctx.events.internalEmit("i18nFatal");
-			return;
+			this._ctx.events.throw("i18nMissingLang", { details: ["'en' builtins mandatory"] });
 		}
 
 		for (const langDict of Object.keys(dict)) {
@@ -171,14 +210,15 @@ export class I18nManager<
 
 			const missing = Object.keys(en).filter(k => !(k in current));
 			if (missing.length) {
-				await this.ctx.events.internalEmit("i18nMissingKeys", {
+				await this._ctx.events.warn("i18nMissingKeys", {
 					details: [`lang:${langDict}`, `missing:${missing.length}`, ...missing]
 				});
 			}
-
-			const unknown = Object.keys(current).filter(k => !(k in en));
+			const unknown: string[] = Object.keys(current).filter(
+				(k) => !(k in en)
+			);
 			if (unknown.length) {
-				await this.ctx.events.internalEmit("i18nUnknownKeys", {
+				this._ctx.events.throw("i18nUnknownKeys", {
 					details: [`lang:${langDict}`, `count:${unknown.length}`, ...unknown]
 				});
 			}
@@ -195,10 +235,8 @@ export class I18nManager<
 
 		}
 
-		this.freezeDict();
-		this.setResolved(resolved);
-
-		await this.ctx.events.internalEmit("i18nReady");
+		this._freezeDict();
+		this._setResolved(resolved);
 	}
 
 	/**
@@ -214,7 +252,7 @@ export class I18nManager<
 	 *   and the original placeholder is preserved
 	 *
 	 * This method is intentionally tolerant:
-	 * - it never throws
+	 * - it never fails
 	 * - it preserves unresolved placeholders for visibility/debugging
 	 *
 	 * @param text - Raw translated text
@@ -232,7 +270,7 @@ export class I18nManager<
 				return values[key]!;
 			}
 
-			this.ctx.events.internalEmit("i18nMissingMessageValues", {
+			this._ctx.events.warn("i18nMissingMessageValues", {
 				details: [key]
 			});
 
@@ -263,7 +301,7 @@ export class I18nManager<
 	 * - Uses `_inject()` for safe runtime substitution
 	 *
 	 * Guard behavior:
-	 * - If called before resolution, i18nFatal is emitted
+	 * - If called before resolution, `getResolved()` emits `i18nMissingResolved`
 	 *
 	 * @param code - Canonical translation code
 	 * @param values - Optional placeholder values
@@ -274,11 +312,6 @@ export class I18nManager<
 		values?: Record<string, string>
 	): Promise<CoreMessage<string>> {
 
-		// guard
-		if (!this.isResolved()) {
-			await this.ctx.events.internalEmit("i18nFatal");
-		}
-
 		const { index, fallbackIndex } = this.getResolved();
 
 		let msg = index[code];
@@ -288,7 +321,7 @@ export class I18nManager<
 			msg = fallbackIndex[code];
 
 			if (msg) {
-				await this.ctx.events.internalEmit("i18nFallbackUsed", {
+				await this._ctx.events.warn("i18nFallbackUsed", {
 					details: [code]
 				});
 			}
@@ -296,13 +329,13 @@ export class I18nManager<
 
 		// missing message
 		if (!msg) {
-			await this.ctx.events.internalEmit("i18nMissingMessage", {
+			await this._ctx.events.warn("i18nMissingMessage", {
 				details: [code]
 			});
 
 			return {
 				code,
-				content: `MISSING 'EN' MESSAGE: ${code}`
+				content: `${code}`
 			};
 		}
 

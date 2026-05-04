@@ -1,4 +1,3 @@
-import { ResolverService } from "@abstracts";
 import {
 	Context,
 	RuntimeFullContext,
@@ -6,9 +5,6 @@ import {
 	RuntimeModuleContext,
 	RuntimeStageContext
 } from "@contexts";
-import {
-	CoreError
-} from "@helpers";
 import {
 	CoreEventsShape,
 	CoreGlobalsShape,
@@ -49,10 +45,10 @@ import {
  * - Emits lifecycle events
  * - Advances internal state machine
  *
- * State machine:
- * - Enforced via _runtimeState and _runtimeTransitions
- * - Any invalid transition throws a CoreError
- * - Ensures strict execution order
+	 * State machine:
+	 * - Enforced via _runtimeState and _runtimeTransitions
+	 * - Any invalid transition emits a terminal runtime event
+	 * - Ensures strict execution order
  *
  * Draft model:
  * - _draft is progressively filled during lifecycle
@@ -89,11 +85,10 @@ export class RuntimeService<
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape
 
-> extends ResolverService<
-	RuntimeFullFacts,
-	TEvents, TStages, TGlobals, TModules, TTranslations
 > {
-
+	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private _draft?: RuntimeFullFacts | undefined;
+	private _resolved?: RuntimeFullFacts;
 	/**
 	 * Current runtime state.
 	 */
@@ -122,10 +117,13 @@ export class RuntimeService<
 	 *
 	 * @param ctx - Global execution context
 	 */
-	constructor(protected readonly ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>) {
-		super(ctx, {} satisfies RuntimeFullFacts);
+	constructor(ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>) {
+		this._ctx = ctx;
+		this._draft = {} satisfies RuntimeFullFacts;
 		this._runtimeState = RuntimeStateEnum.init;
 	}
+
+	public init: () => Promise<void> = async (): Promise<void> => { };
 
 	/**
 	 * Get current runtime state label.
@@ -152,20 +150,65 @@ export class RuntimeService<
 	 * Validates transition against allowed transitions map.
 	 *
 	 * @param next - Next state enum
-	 * @throws CoreError if transition is invalid
 	 */
 	private _setState(next: RuntimeStateEnum) {
 		const currentLabel = RuntimeStateToLabel[this._runtimeState];
 		const nextLabel = RuntimeStateToLabel[next];
 
 		if (!this._runtimeTransitions[this._runtimeState].includes(next)) {
-			throw new CoreError(
-				"INVALID_RUNTIME_TRANSITION",
-				"RuntimeService._setState",
-				`Cannot transition from ${currentLabel} to ${nextLabel}`
-			);
+			this._ctx.events.throw('runtimeInvalidTransition', {
+				details: [
+					`current: ${currentLabel}`,
+					`next: ${nextLabel}`
+				]
+			})
 		}
 		this._runtimeState = next;
+	}
+
+	/**
+	 * Drop the mutable runtime draft once the final runtime has been frozen.
+	 */
+	private _clearDraft() {
+		this._draft = undefined;
+	}
+
+	/**
+	 * Freeze and persist the final resolved runtime facts.
+	 *
+	 * This method is intended to run exactly once, at the end of the lifecycle.
+	 */
+	private _setResolved(state: RuntimeFullFacts): void | never {
+		if (this._resolved) {
+			this._ctx.events.throw('runtimeAlreadyResolved');
+		}
+		this._resolved = this._ctx.helpers.core.deepClone(state);
+		this._resolved = this._ctx.helpers.core.deepFreeze(this._resolved);
+	}
+
+	public getDraft(): RuntimeFullFacts {
+		if (!this._draft) {
+			this._ctx.events.throw('runtimeMissingDraft');
+		}
+		return this._draft;
+	}
+	/**
+	 * Returns resolved state.
+	 *
+	 * @throws CoreError if not resolved
+	 */
+	public getResolved(): RuntimeFullFacts {
+		if (!this._resolved) {
+			this._ctx.events.throw('runtimeMissingResolved');
+		}
+		return this._resolved;
+	}
+
+	/**
+	 * Indicates if state is resolved.
+	 */
+	public isResolved(): boolean {
+		return !!this._resolved;
 	}
 
 	/**
@@ -175,7 +218,7 @@ export class RuntimeService<
 	 * - runtimeInit
 	 */
 	public async setInit() {
-		await this.ctx.events.internalEmit('runtimeInit');
+		await this._ctx.events.emit('runtimeInit');
 	}
 
 	/**
@@ -189,11 +232,11 @@ export class RuntimeService<
 	 * - Emit bootstrapReady
 	 */
 	public async setBootstrap() {
-		await this.ctx.events.internalEmit('bootstrapInit');
-		await this.ctx.bootstrap.resolve();
+		await this._ctx.events.emit('bootstrapInit');
+		await this._ctx.bootstrap.resolve();
 		this._setState(RuntimeStateEnum.bootstrap);
-		this._draft.bootstrap = this.ctx.bootstrap.getResolved();
-		await this.ctx.events.internalEmit('bootstrapReady');
+		this.getDraft().bootstrap = this._ctx.bootstrap.getResolved();
+		await this._ctx.events.emit('bootstrapReady');
 	}
 
 	/**
@@ -208,35 +251,54 @@ export class RuntimeService<
 	 * - Emit stageReady
 	 */
 	public async setStage() {
-		await this.ctx.events.internalEmit('stageInit', {});
+		await this._ctx.events.emit('stageInit');
 
-		await this.ctx.stages.resolve();
+		await this._ctx.stages.resolve();
+
+		const stage = this._ctx.stages.getResolved();
 
 		this._setState(RuntimeStateEnum.stage);
-		this._draft.stage = this.ctx.stages.getResolved();
+		this.getDraft().stage = stage;
 
 		await this._setI18n();
-		await this.ctx.parser.resolve();
+		await this._setParser();
 
-		const displayStageName = this.ctx.helpers.core.getDisplayStageName(
-			this.ctx.stages.getResolved().name,
-			this.ctx.settings.defaultStageName
+		const displayStageName = this._ctx.helpers.core.getDisplayStageName(
+			stage.name,
+			this._ctx.settings.defaultStageName
 		);
 
-		await this.ctx.events.internalEmit("stageReady", {
-			details: [`${displayStageName}`]
-		});
+			await this._ctx.events.emit("stageReady", {
+				values: { stage: `${displayStageName}` }
+			});
+	}
+
+	/**
+	 * Initialize parser resolution for the current runtime cycle.
+	 *
+	 * This internal step emits `parserInit` and lets `ParserManager`
+	 * accumulate parsing state inside its own draft store.
+	 */
+	private async _setParser() {
+		await this._ctx.events.emit('parserInit');
+		await this._ctx.parser.resolve();
 	}
 
 	/**
 	 * Resolve i18n phase.
 	 *
 	 * Internal step triggered after stage resolution.
+	 *
+	 * It resolves the active language, freezes runtime i18n facts
+	 * and injects them into the runtime draft before the parser is finalized.
 	 */
 	private async _setI18n() {
-		await this.ctx.i18n.resolve();
+		await this._ctx.events.emit('i18nInit');
+		await this._ctx.i18n.resolve();
 		this._setState(RuntimeStateEnum.i18n);
-		this._draft.i18n = this.ctx.i18n.getResolved();
+		const i18n = this._ctx.i18n.getResolved();
+		this.getDraft().i18n = i18n;
+		await this._ctx.events.emit('i18nReady');
 	}
 
 	/**
@@ -250,34 +312,36 @@ export class RuntimeService<
 	 * - Emit globalsReady
 	 */
 	public async setGlobals() {
-		await this.ctx.events.internalEmit('globalsInit');
-		await this.ctx.globals.resolve();
+		await this._ctx.events.emit('globalsInit');
+		await this._ctx.globals.resolve();
 		this._setState(RuntimeStateEnum.globals);
-		this._draft.globals = this.ctx.globals.getResolved();
-		await this.ctx.events.internalEmit('globalsReady');
+		this.getDraft().globals = this._ctx.globals.getResolved();
+		await this._ctx.events.emit('globalsReady', {
+			values: {
+				globals: JSON.stringify(this.getDraft().globals!, null, 4)
+			}
+		});
 	}
 
 	/**
 	 * Resolve module/action phase.
 	 *
 	 * Steps:
-	 * - Emit actionInit
+	 * - Emit modulesInit
 	 * - Resolve ModulesManager (includes parser.resolveModule)
 	 * - Update runtime draft
 	 * - Transition state
-	 * - Emit actionReady
+	 * - Emit modulesReady
 	 *
 	 * Note:
 	 * - Module and action are resolved together
 	 */
-	public async setAction() {
-		await this.ctx.events.internalEmit('actionInit');
-
-		await this.ctx.modules.resolve();
+	public async setModules() {
+		await this._ctx.events.emit('modulesInit');
+		await this._ctx.modules.resolve();
 		this._setState(RuntimeStateEnum.module);
-		this._draft.module = this.ctx.modules.getResolved();
-
-		await this.ctx.events.internalEmit('actionReady');
+		this.getDraft().module = this._ctx.modules.getResolved();
+		await this._ctx.events.emit('modulesReady');
 	}
 
 	/**
@@ -285,15 +349,18 @@ export class RuntimeService<
 	 *
 	 * Steps:
 	 * - Finalize parser
+	 * - Emit parserReady
 	 * - Transition to ready state
 	 * - Freeze runtime (setResolved)
 	 * - Emit runtimeReady
 	 */
 	public async setReady() {
-		await this.ctx.parser.finalize();
+		this._ctx.parser.finalize();
+		await this._ctx.events.emit('parserReady');
 		this._setState(RuntimeStateEnum.ready);
-		this.setResolved(this._draft);
-		this.ctx.events.internalEmit('runtimeReady');
+		this._setResolved(this._ctx.helpers.core.deepClone(this.getDraft()));
+		this._clearDraft();
+		await this._ctx.events.emit('runtimeReady');
 	}
 
 	/**
@@ -301,12 +368,14 @@ export class RuntimeService<
 	 *
 	 * Includes:
 	 * - bootstrap (resolved)
-	 * - stage (draft)
+	 * - stage (draft from StagesManager)
+	 *
+	 * This is the earliest runtime view exposed to hooks.
 	 */
 	public stageContext(): RuntimeStageContext {
 		return {
-			bootstrap: this.ctx.bootstrap.getResolved(),
-			stage: this.ctx.stages.getDraft()
+			bootstrap: this._ctx.bootstrap.getResolved(),
+			stage: this._ctx.stages.getDraft()
 		}
 	}
 
@@ -316,13 +385,13 @@ export class RuntimeService<
 	 * Includes:
 	 * - bootstrap (resolved)
 	 * - stage (resolved)
-	 * - globals (draft)
+	 * - globals (draft from GlobalsManager)
 	 */
 	public globalsContext(): RuntimeGlobalsContext {
 		return {
-			bootstrap: this.ctx.bootstrap.getResolved(),
-			stage: this.ctx.stages.getResolved(),
-			globals: this.ctx.globals.getDraft()
+			bootstrap: this._ctx.bootstrap.getResolved(),
+			stage: this._ctx.stages.getResolved(),
+			globals: this._ctx.globals.getDraft()
 		}
 	}
 
@@ -333,15 +402,15 @@ export class RuntimeService<
 	 * - bootstrap (resolved)
 	 * - stage (resolved)
 	 * - globals (resolved)
-	 * - module (draft)
+	 * - module (draft from ModulesManager)
 	 */
 	public moduleContext(): RuntimeModuleContext {
 
 		return {
-			bootstrap: this.ctx.bootstrap.getResolved(),
-			stage: this.ctx.stages.getResolved(),
-			globals: this.ctx.globals.getResolved(),
-			module: this.ctx.modules.getDraft()
+			bootstrap: this._ctx.bootstrap.getResolved(),
+			stage: this._ctx.stages.getResolved(),
+			globals: this._ctx.globals.getResolved(),
+			module: this._ctx.modules.getDraft()
 		}
 	}
 

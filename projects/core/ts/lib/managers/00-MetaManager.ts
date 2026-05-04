@@ -2,10 +2,9 @@
 // - V0.1: metadata is manually defined (static values)
 // - No dynamic resolution (git, build, etc.)
 
-// TODO: V0.1 — Add getters/setters to allow CLI.init() to override meta (name, version, author)
+// TODO: V0.1 — Add setters to allow CLI.init() to override meta (name, version, author)
 // TODO: V2.0 — Connect MetaManager to git versioning, build number, commit hash, etc.
 
-import { BaseDictComponent } from "@abstracts";
 import { Context } from "@contexts";
 import {
 	CoreEventsShape,
@@ -49,11 +48,12 @@ export type CoreMetaShape = {
  *
  * Responsibilities:
  * - Provide a central metadata dictionary
- * - Ensure immutability once frozen (via BaseDictComponent)
+ * - Expose a read-only metadata snapshot to the rest of the core
  *
  * Current behavior (v0.1):
  * - Static initialization only
  * - No dynamic updates after construction
+ * - No runtime resolution logic yet
  *
  * Future (v2):
  * - Auto-injection from git (version, commit hash, build number)
@@ -71,19 +71,33 @@ export class MetaManager<
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape
-> extends BaseDictComponent<
-	CoreMetaShape,
-	TEvents, TStages, TGlobals, TModules, TTranslations
 > {
 
-	constructor(protected ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>) {
-		super(ctx, {
+	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private _meta: CoreMetaShape;
+
+	constructor(ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>) {
+		this._ctx = ctx;
+		this._meta = {
 			core: {
 				version: "0.1.0",
 				author: "k4mie"
 			},
 			cli: {}
-		} satisfies CoreMetaShape)
+		} satisfies CoreMetaShape;
 	}
 
+	public init: () => Promise<void> = async (): Promise<void> => { };
+
+	/**
+	 * Return a read-only metadata snapshot.
+	 *
+	 * This manager currently acts as a thin storage layer until future versions
+	 * introduce automatic core and CLI metadata resolution/versioning.
+	 */
+	public getMeta(): Readonly<CoreMetaShape> {
+		const meta = this._ctx.helpers.core.deepClone(this._meta);
+		this._ctx.helpers.core.deepFreeze(meta);
+		return meta;
+	}
 }

@@ -37,7 +37,7 @@ Il ne fait qu’une chose :
 
 * sélectionner l’engine à utiliser en fonction des settings
 
-```ts id="u9x2lp"
+```ts
 const engineName = this.ctx.settings.engine ?? 'std';
 ```
 

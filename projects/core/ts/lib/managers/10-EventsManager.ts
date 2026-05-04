@@ -1,4 +1,3 @@
-import { LiveManagerWithDict } from "@abstracts";
 import { Context } from "@contexts";
 import { BuiltinEvents, FinalEvents } from "@data";
 import {
@@ -14,16 +13,22 @@ import {
 	CoreModulesShape,
 	CoreStagesShape,
 	CoreTranslationsShape,
+	EmitOptionsForEvent,
 	EmitOptionsForKey,
 	EventDictKey,
+	EventFlowListener,
+	EventKeysByKindAndLevel,
+	EventKeysByLevel,
 	EventListener,
+	EventOutputListener,
 	EventSelector,
 	LiveCoreEventsDict,
-	MessageEventKeys,
 	RuntimeCoreEvent,
 	RuntimeCoreMessageEvent,
 	RuntimeCoreSignalEvent,
-	SignalEventKeys
+	TerminalEventKeys,
+	TerminalMessageKeys,
+	TerminalSignalKeys,
 } from "@types";
 
 // TODO: V0.1: Polish the entire class: remove the builtins hook methods for old builtin stages and their caller method
@@ -37,18 +42,33 @@ import {
  * - Store and index runtime events
  * - Manage listeners (system / flow / runtime)
  * - Provide low-level primitives for event dispatching
+ * - Enforce core event semantics (message/signal, terminal levels, flow triggers)
  *
  * Architecture:
  * - Event definitions (dict) are immutable
  * - Runtime state (live) is mutable and indexed
+ * - Events are active runtime primitives, not passive logs
  *
  * Listener layers:
- * - system   → core internal logic
- * - flow     → lifecycle orchestration (FED engine)
- * - runtime  → user/dev hooks
+ * - system   → passive core-owned listeners registered by default
+ * - flow     → runtime orchestration listeners used by FED engines
+ * - runtime  → passive developer listeners registered at runtime
+ *
+ * Event model:
+ * - `signal` events carry raw `details` and do not require i18n
+ * - `message` events carry `values` and are i18n-capable
+ * - `trace` / `debug` / `info` / `warning` are informative or observability-oriented
+ * - `error` / `fatal` are terminal and stop script execution after dispatch
+ * - `trigger: true` enables flow dispatch only when the selected engine is `fed`
+ * - terminal events are never used as flow-control events
  *
  * Wildcard strategy:
  * - "*" listeners stored separately for performance
+ *
+ * Channel strategy:
+ * - passive listeners may be grouped by channel
+ * - runtime listeners override system listeners on the same channel
+ * - this allows developer outputs to replace builtin outputs without mutating core wiring
  *
  * WARNING:
  * - This is a critical core component
@@ -60,25 +80,25 @@ export class EventsManager<
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape
-> extends LiveManagerWithDict<
-	FinalEvents<TEvents>,
-	LiveCoreEventsDict,
-	TEvents, TStages, TGlobals, TModules, TTranslations
 > {
 
+	private readonly _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private _events: FinalEvents<TEvents>;
+	private _live: LiveCoreEventsDict;
+
 	/**
-	 * Listener stores by event.code
+	 * Listener stores by event.name
 	 */
-	private systemListeners: Map<string, EventListener[]> = new Map();
-	private flowListeners: Map<string, EventListener[]> = new Map();
-	private runtimeListeners: Map<string, EventListener[]> = new Map();
+	private _systemListeners: Map<string, EventOutputListener[]> = new Map();
+	private _flowListeners: Map<string, EventFlowListener[]> = new Map();
+	private _runtimeListeners: Map<string, EventOutputListener[]> = new Map();
 
 	/**
 	 * Wildcard listeners ("*")
 	 */
-	private systemWildcardListeners: EventListener[] = [];
-	private flowWildcardListeners: EventListener[] = [];
-	private runtimeWildcardListeners: EventListener[] = [];
+	private _systemWildcardListeners: EventOutputListener[] = [];
+	private _flowWildcardListeners: EventFlowListener[] = [];
+	private _runtimeWildcardListeners: EventOutputListener[] = [];
 
 	/**
 	 * Initialize EventsManager
@@ -88,30 +108,56 @@ export class EventsManager<
 	 * - Freezes event definitions
 	 */
 	constructor(
-		protected readonly ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>,
-		_events: FinalEvents<TEvents>
+		ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>,
+		events: FinalEvents<TEvents>
 	) {
-		super(
-			ctx,
-			_events,
-			{
-				list: [],
-				byId: {},
-				index: {
-					byKind: {},
-					byLevel: {},
-					byPhase: {}
-				}
-			} satisfies LiveCoreEventsDict
-		);
-		this.freezeDict();
+		this._ctx = ctx;
+		this._events = events;
+		this._live = {
+			list: [],
+			byId: {},
+			index: {
+				byKind: {},
+				byLevel: {},
+				byPhase: {}
+			}
+		} satisfies LiveCoreEventsDict;
+		this.init();
+	}
+
+	// This init is not async because it has to be executed during constructor phase
+	/**
+	 * Finalize manager initialization.
+	 *
+	 * Event definitions are frozen immediately because the core event registry is
+	 * part of the runtime truth consumed by every other manager.
+	 */
+	private init() {
+		this._freezeEvents();
+	}
+
+	/**
+	 * Freeze the final event dictionary once the manager is constructed.
+	 */
+	private _freezeEvents() {
+		this._events = this._ctx.helpers.core.deepFreeze(this._events);
+	}
+
+	public getEvents(): FinalEvents<TEvents> {
+		return this._events;
+	}
+
+	public getLive(): Readonly<LiveCoreEventsDict> {
+		const live = this._ctx.helpers.core.deepClone(this._live);
+		this._ctx.helpers.core.deepFreeze(live);
+		return live;
 	}
 
 	/**
 	 * Index event into lookup structures
 	 */
-	private _index<Code extends string>(
-		event: RuntimeCoreEvent<Code>,
+	private _index<Name extends string>(
+		event: RuntimeCoreEvent<Name>,
 		state: LiveCoreEventsDict
 	) {
 		this._push(state.index.byKind, event.kind, event);
@@ -122,10 +168,10 @@ export class EventsManager<
 	/**
 	 * Push event ID into index bucket
 	 */
-	private _push<K extends CoreEventKind | CoreEventLevel | CoreEventPhase, Code extends string>(
+	private _push<K extends CoreEventKind | CoreEventLevel | CoreEventPhase, Name extends string>(
 		map: Partial<Record<K, string[]>>,
 		key: K,
-		event: RuntimeCoreEvent<Code>
+		event: RuntimeCoreEvent<Name>
 	) {
 		map[key] ??= [];
 		map[key].push(event.id);
@@ -149,16 +195,19 @@ export class EventsManager<
 	/**
 	 * Create and register runtime event
 	 */
-	private _createEvent<Code extends string>(payload: CoreEvent<Code>): RuntimeCoreEvent<Code> {
-		const event: RuntimeCoreEvent<Code> = {
-			id: this.ctx.providers.id.create(),
+	private _createEvent<
+		Name extends string,
+	>(payload: CoreEvent<Name>): RuntimeCoreEvent<Name> {
+
+		const event: RuntimeCoreEvent<Name> = {
+			id: this._ctx.providers.id.create(),
 			ts: Date.now(),
 			...payload
 		};
 
-		this.getLive().list.push(event);
-		this.getLive().byId[event.id] = event;
-		this._index(event, this.getLive());
+		this._live.list.push(event);
+		this._live.byId[event.id] = event;
+		this._index(event, this._live);
 
 		return event;
 	}
@@ -185,54 +234,62 @@ export class EventsManager<
 	}
 
 	/**
-	 * Resolve selector to event code
+	 * Resolve a public selector to a concrete runtime event name.
+	 *
+	 * `*` is preserved as a wildcard sentinel and therefore resolves to `null`.
 	 */
-	private _selectorToCode(
+	private _selectorToName(
 		key: EventSelector<TEvents>
 	): string | null {
 		if (key === "*") return null;
 
-		const evt = this.getDict()[key];
-		return evt?.code ?? null;
+		const evt = this.getEvents()[key];
+		return evt?.name ?? null;
 	}
 
 	/**
-	 * Register listener (resolved)
+	 * Register listener against a resolved event name or wildcard bucket.
+	 *
+	 * The listener family is preserved through the generic parameter so flow and
+	 * passive output listeners never get mixed in internal stores.
 	 */
-	private _registerResolvedListener(
-		store: Map<string, EventListener[]>,
-		wildcardStore: EventListener[],
-		code: string | null,
-		handler: EventListener
+	private _registerResolvedListener<T extends EventListener>(
+		store: Map<string, T[]>,
+		wildcardStore: T[],
+		name: string | null,
+		handler: T
 	) {
-		if (code === null) {
+		if (name === null) {
 			wildcardStore.push(handler);
 			return;
 		}
 
-		if (!store.has(code)) {
-			store.set(code, []);
+		if (!store.has(name)) {
+			store.set(name, []);
 		}
 
-		store.get(code)!.push(handler);
+		store.get(name)!.push(handler);
 	}
 
 	/**
-	 * Remove listener (resolved)
+	 * Remove listener from a resolved event name or wildcard bucket.
+	 *
+	 * The listener family is preserved through the generic parameter so removal
+	 * stays aligned with the corresponding internal store.
 	 */
-	private _offResolvedListener(
-		store: Map<string, EventListener[]>,
-		wildcardStore: EventListener[],
-		code: string | null,
-		handler: EventListener
+	private _offResolvedListener<T extends EventListener>(
+		store: Map<string, T[]>,
+		wildcardStore: T[],
+		name: string | null,
+		handler: T
 	) {
-		if (code === null) {
+		if (name === null) {
 			const index = wildcardStore.indexOf(handler);
 			if (index !== -1) wildcardStore.splice(index, 1);
 			return;
 		}
 
-		const list = store.get(code);
+		const list = store.get(name);
 		if (!list) return;
 
 		const index = list.indexOf(handler);
@@ -243,31 +300,37 @@ export class EventsManager<
 
 	/**
 	 * Register one-time listener
+	 *
+	 * The listener unregisters itself on first execution while preserving the
+	 * original listener shape, including channel binding for passive output
+	 * listeners when one exists.
 	 */
-	private _onceResolvedListener(
-		register: (code: string | null, handler: EventListener) => void,
-		off: (code: string | null, handler: EventListener) => void,
-		code: string | null,
-		handler: EventListener
+	private _onceResolvedListener<Listener extends EventListener>(
+		register: (name: string | null, handler: Listener) => void,
+		off: (name: string | null, handler: Listener) => void,
+		name: string | null,
+		handler: Listener
 	) {
-		const wrapper: EventListener = {
+		const wrapper: Listener = {
 			handler: async (event) => {
-				off(code, wrapper);
+				off(name, wrapper);
 				await handler.handler(event);
 			},
-			...(handler.channel !== undefined && { channel: handler.channel })
-		}
-		register(code, wrapper);
+			...(("channel" in handler && handler.channel !== undefined)
+				? { channel: handler.channel }
+				: {})
+		} as Listener;
+		register(name, wrapper);
 	}
 
 	/**
 	 * Register system listener
 	 */
-	private _registerSystemResolvedListener(code: string | null, handler: EventListener) {
+	private _registerSystemResolvedListener(name: string | null, handler: EventOutputListener) {
 		this._registerResolvedListener(
-			this.systemListeners,
-			this.systemWildcardListeners,
-			code,
+			this._systemListeners,
+			this._systemWildcardListeners,
+			name,
 			handler
 		);
 	}
@@ -275,11 +338,11 @@ export class EventsManager<
 	/**
 	 * Register flow listener
 	 */
-	private _registerFlowResolvedListener(code: string | null, handler: EventListener) {
+	private _registerFlowResolvedListener(name: string | null, handler: EventFlowListener) {
 		this._registerResolvedListener(
-			this.flowListeners,
-			this.flowWildcardListeners,
-			code,
+			this._flowListeners,
+			this._flowWildcardListeners,
+			name,
 			handler
 		);
 	}
@@ -287,11 +350,11 @@ export class EventsManager<
 	/**
 	 * Register runtime listener
 	 */
-	private _registerRuntimeResolvedListener(code: string | null, handler: EventListener) {
+	private _registerRuntimeResolvedListener(name: string | null, handler: EventOutputListener) {
 		this._registerResolvedListener(
-			this.runtimeListeners,
-			this.runtimeWildcardListeners,
-			code,
+			this._runtimeListeners,
+			this._runtimeWildcardListeners,
+			name,
 			handler
 		);
 	}
@@ -299,11 +362,11 @@ export class EventsManager<
 	/**
 	 * Remove system listener
 	 */
-	private _offSystemResolvedListener(code: string | null, handler: EventListener) {
+	private _offSystemResolvedListener(name: string | null, handler: EventOutputListener) {
 		this._offResolvedListener(
-			this.systemListeners,
-			this.systemWildcardListeners,
-			code,
+			this._systemListeners,
+			this._systemWildcardListeners,
+			name,
 			handler
 		);
 	}
@@ -311,11 +374,11 @@ export class EventsManager<
 	/**
 	 * Remove flow listener
 	 */
-	private _offFlowResolvedListener(code: string | null, handler: EventListener) {
+	private _offFlowResolvedListener(name: string | null, handler: EventFlowListener) {
 		this._offResolvedListener(
-			this.flowListeners,
-			this.flowWildcardListeners,
-			code,
+			this._flowListeners,
+			this._flowWildcardListeners,
+			name,
 			handler
 		);
 	}
@@ -323,11 +386,11 @@ export class EventsManager<
 	/**
 	 * Remove runtime listener
 	 */
-	private _offRuntimeResolvedListener(code: string | null, handler: EventListener) {
+	private _offRuntimeResolvedListener(name: string | null, handler: EventOutputListener) {
 		this._offResolvedListener(
-			this.runtimeListeners,
-			this.runtimeWildcardListeners,
-			code,
+			this._runtimeListeners,
+			this._runtimeWildcardListeners,
+			name,
 			handler
 		);
 	}
@@ -341,39 +404,40 @@ export class EventsManager<
 	 */
 	public registerSystemListener<K extends EventDictKey<TEvents>>(
 		key: K,
-		handler: EventListener
+		handler: EventOutputListener
 	): void;
 	public registerSystemListener(
 		key: "*",
-		handler: EventListener
+		handler: EventOutputListener
 	): void;
 	public registerSystemListener(
 		key: EventSelector<TEvents>,
-		handler: EventListener
+		handler: EventOutputListener
 	): void {
-		const code = this._selectorToCode(key);
-		this._registerSystemResolvedListener(code, handler);
+		const name = this._selectorToName(key);
+		this._registerSystemResolvedListener(name, handler);
 	}
 
 	/**
 	 * Register a flow-level listener
 	 *
-	 * Used by FED engine to orchestrate runtime lifecycle.
+	 * Used by FED engines to orchestrate runtime lifecycle from events carrying
+	 * `trigger: true`.
 	 */
 	public registerFlowListener<K extends EventDictKey<TEvents>>(
 		key: K,
-		handler: EventListener
+		handler: EventFlowListener
 	): void;
 	public registerFlowListener(
 		key: "*",
-		handler: EventListener
+		handler: EventFlowListener
 	): void;
 	public registerFlowListener(
 		key: EventSelector<TEvents>,
-		handler: EventListener
+		handler: EventFlowListener
 	): void {
-		const code = this._selectorToCode(key);
-		this._registerFlowResolvedListener(code, handler);
+		const name = this._selectorToName(key);
+		this._registerFlowResolvedListener(name, handler);
 	}
 
 	/**
@@ -383,18 +447,18 @@ export class EventsManager<
 	 */
 	public registerRuntimeListener<K extends EventDictKey<TEvents>>(
 		key: K,
-		handler: EventListener
+		handler: EventOutputListener
 	): void;
 	public registerRuntimeListener(
 		key: "*",
-		handler: EventListener
+		handler: EventOutputListener
 	): void;
 	public registerRuntimeListener(
 		key: EventSelector<TEvents>,
-		handler: EventListener
+		handler: EventOutputListener
 	): void {
-		const code = this._selectorToCode(key);
-		this._registerRuntimeResolvedListener(code, handler);
+		const name = this._selectorToName(key);
+		this._registerRuntimeResolvedListener(name, handler);
 	}
 
 	/**
@@ -402,18 +466,18 @@ export class EventsManager<
 	 */
 	public offSystemListener<K extends EventDictKey<TEvents>>(
 		key: K,
-		handler: EventListener
+		handler: EventOutputListener
 	): void;
 	public offSystemListener(
 		key: "*",
-		handler: EventListener
+		handler: EventOutputListener
 	): void;
 	public offSystemListener(
 		key: EventSelector<TEvents>,
-		handler: EventListener
+		handler: EventOutputListener
 	): void {
-		const code = this._selectorToCode(key);
-		this._offSystemResolvedListener(code, handler);
+		const name = this._selectorToName(key);
+		this._offSystemResolvedListener(name, handler);
 	}
 
 	/**
@@ -421,18 +485,18 @@ export class EventsManager<
 	 */
 	public offFlowListener<K extends EventDictKey<TEvents>>(
 		key: K,
-		handler: EventListener
+		handler: EventFlowListener
 	): void;
 	public offFlowListener(
 		key: "*",
-		handler: EventListener
+		handler: EventFlowListener
 	): void;
 	public offFlowListener(
 		key: EventSelector<TEvents>,
-		handler: EventListener
+		handler: EventFlowListener
 	): void {
-		const code = this._selectorToCode(key);
-		this._offFlowResolvedListener(code, handler);
+		const name = this._selectorToName(key);
+		this._offFlowResolvedListener(name, handler);
 	}
 
 	/**
@@ -440,18 +504,18 @@ export class EventsManager<
 	 */
 	public offRuntimeListener<K extends EventDictKey<TEvents>>(
 		key: K,
-		handler: EventListener
+		handler: EventOutputListener
 	): void;
 	public offRuntimeListener(
 		key: "*",
-		handler: EventListener
+		handler: EventOutputListener
 	): void;
 	public offRuntimeListener(
 		key: EventSelector<TEvents>,
-		handler: EventListener
+		handler: EventOutputListener
 	): void {
-		const code = this._selectorToCode(key);
-		this._offRuntimeResolvedListener(code, handler);
+		const name = this._selectorToName(key);
+		this._offRuntimeResolvedListener(name, handler);
 	}
 
 	/**
@@ -459,21 +523,21 @@ export class EventsManager<
 	 */
 	public onceSystemListener<K extends EventDictKey<TEvents>>(
 		key: K,
-		handler: EventListener
+		handler: EventOutputListener
 	): void;
 	public onceSystemListener(
 		key: "*",
-		handler: EventListener
+		handler: EventOutputListener
 	): void;
 	public onceSystemListener(
 		key: EventSelector<TEvents>,
-		handler: EventListener
+		handler: EventOutputListener
 	): void {
-		const code = this._selectorToCode(key);
+		const name = this._selectorToName(key);
 		this._onceResolvedListener(
 			this._registerSystemResolvedListener.bind(this),
 			this._offSystemResolvedListener.bind(this),
-			code,
+			name,
 			handler
 		);
 	}
@@ -488,13 +552,14 @@ export class EventsManager<
 	 * Default behavior:
 	 * - listens to all events ("*")
 	 * - channel = "default"
+	 * - overrides any system listener registered on the same channel
 	 */
 	public setOutputListener(
 		handler: (event: RuntimeCoreEvent<string>) => void | Promise<void>,
 		channel: string = "default",
 		eventKeys?: EventSelector<TEvents>[] | "*"
 	) {
-		const listener: EventListener = {
+		const listener: EventOutputListener = {
 			handler,
 			channel
 		};
@@ -502,7 +567,7 @@ export class EventsManager<
 		const keys = eventKeys && eventKeys.length > 0 ? eventKeys : ["*"];
 
 		for (const key of keys) {
-			this.ctx.events.registerRuntimeListener(key as any, listener);
+			this._ctx.events.registerRuntimeListener(key as any, listener);
 		}
 	}
 
@@ -511,21 +576,21 @@ export class EventsManager<
 	 */
 	public onceFlowListener<K extends EventDictKey<TEvents>>(
 		key: K,
-		handler: EventListener
+		handler: EventFlowListener
 	): void;
 	public onceFlowListener(
 		key: "*",
-		handler: EventListener
+		handler: EventFlowListener
 	): void;
 	public onceFlowListener(
 		key: EventSelector<TEvents>,
-		handler: EventListener
+		handler: EventFlowListener
 	): void {
-		const code = this._selectorToCode(key);
-		this._onceResolvedListener(
+		const name = this._selectorToName(key);
+		this._onceResolvedListener<EventFlowListener>(
 			this._registerFlowResolvedListener.bind(this),
 			this._offFlowResolvedListener.bind(this),
-			code,
+			name,
 			handler
 		);
 	}
@@ -535,21 +600,21 @@ export class EventsManager<
 	 */
 	public onceRuntimeListener<K extends EventDictKey<TEvents>>(
 		key: K,
-		handler: EventListener
+		handler: EventOutputListener
 	): void;
 	public onceRuntimeListener(
 		key: "*",
-		handler: EventListener
+		handler: EventOutputListener
 	): void;
 	public onceRuntimeListener(
 		key: EventSelector<TEvents>,
-		handler: EventListener
+		handler: EventOutputListener
 	): void {
-		const code = this._selectorToCode(key);
+		const name = this._selectorToName(key);
 		this._onceResolvedListener(
 			this._registerRuntimeResolvedListener.bind(this),
 			this._offRuntimeResolvedListener.bind(this),
-			code,
+			name,
 			handler
 		);
 	}
@@ -558,15 +623,18 @@ export class EventsManager<
 	 * Resolve handlers for an event
 	 *
 	 * Returns:
-	 * - specific handlers (event.code)
+	 * - specific handlers (event.name)
 	 * - wildcard handlers ("*")
+	 *
+	 * The listener family is preserved through the generic parameter so callers
+	 * receive either flow listeners or passive output listeners, never a mixed set.
 	 */
-	private _getHandlersForEvent(
+	private _getHandlersForEvent<Listener extends EventListener>(
 		runtimeEvent: RuntimeCoreEvent<string>,
-		store: Map<string, EventListener[]>,
-		wildcardStore: EventListener[]
-	): EventListener[] {
-		const handlers = store.get(runtimeEvent.code) ?? [];
+		store: Map<string, Listener[]>,
+		wildcardStore: Listener[]
+	): Listener[] {
+		const handlers = store.get(runtimeEvent.name) ?? [];
 		return [...handlers, ...wildcardStore];
 	}
 
@@ -576,26 +644,27 @@ export class EventsManager<
 	 * Rules:
 	 * - Handlers grouped by channel
 	 * - Runtime handlers override system handlers per channel
+	 * - Flow listeners are excluded from this passive dispatch path
 	 */
 	private async _dispatchWithChannels(
 		runtimeEvent: RuntimeCoreEvent<string>
 	) {
 		const systemHandlers = this._getHandlersForEvent(
 			runtimeEvent,
-			this.systemListeners,
-			this.systemWildcardListeners
+			this._systemListeners,
+			this._systemWildcardListeners
 		);
 
 		const runtimeHandlers = this._getHandlersForEvent(
 			runtimeEvent,
-			this.runtimeListeners,
-			this.runtimeWildcardListeners
+			this._runtimeListeners,
+			this._runtimeWildcardListeners
 		);
 
-		const systemByChannel = new Map<string, EventListener[]>();
-		const runtimeByChannel = new Map<string, EventListener[]>();
+		const systemByChannel = new Map<string, EventOutputListener[]>();
+		const runtimeByChannel = new Map<string, EventOutputListener[]>();
 
-		const group = (handlers: EventListener[], target: Map<string, EventListener[]>) => {
+		const group = (handlers: EventOutputListener[], target: Map<string, EventOutputListener[]>) => {
 			for (const h of handlers) {
 				const channel = h.channel ?? "default";
 				if (!target.has(channel)) target.set(channel, []);
@@ -631,14 +700,17 @@ export class EventsManager<
 	/**
 	 * Simple dispatch (no channel logic)
 	 *
-	 * Used for flow listeners (FED engine)
+	 * Used for flow listeners only.
+	 *
+	 * Unlike passive listeners, flow listeners are not channelized because they
+	 * participate in engine orchestration rather than output replacement.
 	 */
 	private async _dispatchListeners(
 		runtimeEvent: RuntimeCoreEvent<string>,
-		store: Map<string, EventListener[]>,
-		wildcardStore: EventListener[]
+		store: Map<string, EventFlowListener[]>,
+		wildcardStore: EventFlowListener[]
 	) {
-		const handlers = store.get(runtimeEvent.code) ?? [];
+		const handlers = store.get(runtimeEvent.name) ?? [];
 		const allHandlers = [...handlers, ...wildcardStore];
 
 		for (const handler of allHandlers) {
@@ -649,16 +721,10 @@ export class EventsManager<
 	/**
 	 * Handle terminal events
 	 *
-	 * error / fatal → process.exit(1)
+	 * `error` / `fatal` terminate the process immediately after dispatch.
 	 */
-	private _handleTerminalEvent(runtimeEvent: RuntimeCoreEvent<string>): never | void {
-		if (runtimeEvent.level === CoreEventLevel.fatal) {
-			process.exit(1);
-		}
-
-		if (runtimeEvent.level === CoreEventLevel.error) {
-			process.exit(1);
-		}
+	private _handleTerminalEvent(): never {
+		process.exit(1);
 	}
 
 	/**
@@ -667,91 +733,191 @@ export class EventsManager<
 	 * Steps:
 	 * 1. Create runtime event
 	 * 2. Inject payload (details / values)
-	 * 3. Dispatch system + runtime
-	 * 4. Dispatch flow (FED engine only)
+	 * 3. Dispatch passive listeners with channel override semantics
+	 * 4. Dispatch flow listeners only when engine is `fed` and `trigger === true`
 	 * 5. Handle terminal events
+	 *
+	 * Terminal rule:
+	 * - `error` and `fatal` never participate in flow dispatch
 	 */
-	private async _emit<K extends keyof TEvents>(
+	private async _emit<K extends keyof FinalEvents<TEvents>>(
 		key: K,
-		options?: EmitOptionsForKey<TEvents, K>
-	): Promise<RuntimeCoreEvent<TEvents[K]["code"]> | undefined> {
+		options?: EmitOptionsForKey<FinalEvents<TEvents>, K>
+	): Promise<RuntimeCoreEvent<string> | undefined> {
 
-		const evt = this.getDict()[key];
-		if (!evt) return;
+
+		const evt = this.getEvents()[key];
+		if (!evt) this.throw('runtimeMissingEvent', {
+			details: [`Unknown key: ${key as string}`]
+		});
+
+		const isTerminal =
+			evt.level === CoreEventLevel.error ||
+			evt.level === CoreEventLevel.fatal;
 
 		const runtimeEvent = this._createEvent(evt);
 
 		if (evt.kind === CoreEventKind.signal) {
 			if (options && "details" in options) {
-				(runtimeEvent as RuntimeCoreSignalEvent<TEvents[K]["code"]>).details = options.details;
+				(runtimeEvent as RuntimeCoreSignalEvent<TEvents[K]["name"]>).details = options.details;
 			}
 		}
 
 		if (evt.kind === CoreEventKind.message) {
 			if (options && "values" in options) {
-				(runtimeEvent as RuntimeCoreMessageEvent<TEvents[K]["code"]>).values = options.values;
+				(runtimeEvent as RuntimeCoreMessageEvent<TEvents[K]["name"]>).values = options.values;
 			}
 		}
 
 		await this._dispatchWithChannels(runtimeEvent);
 
-		if (this.ctx.settings.engine === "fed" && evt.trigger === true) {
+		if (this._ctx.settings.engine === "fed" && evt.trigger === true && !isTerminal) {
 			await this._dispatchListeners(
 				runtimeEvent,
-				this.flowListeners,
-				this.flowWildcardListeners
+				this._flowListeners,
+				this._flowWildcardListeners
 			);
 		}
 
-		this._handleTerminalEvent(runtimeEvent);
+		if (isTerminal) {
+			this._handleTerminalEvent();
 
-		return runtimeEvent;
+		} else {
+
+			return runtimeEvent;
+		}
+
 	}
 
 	/**
-	 * Internal emit (builtins only)
+	 * Emit builtin non-terminal events reserved for the core.
 	 */
-	public async internalEmit<K extends keyof BuiltinEvents>(
+	public async emit<
+		K extends EventKeysByLevel<BuiltinEvents, CoreEventLevel.trace | CoreEventLevel.debug | CoreEventLevel.info>
+	>(
 		key: K,
 		options?: EmitOptionsForKey<BuiltinEvents, K>
-	): Promise<RuntimeCoreEvent<TEvents[K]["code"]> | undefined> {
-		return this._emit(key, options as EmitOptionsForKey<TEvents, K> | undefined);
+	) {
+		return await this._emit(key, options as EmitOptionsForKey<FinalEvents<TEvents>, K> | undefined);
 	}
-
-	/**
-	 * Emit signal event (developer-facing)
-	 */
-	public async emitSignal<
-		K extends SignalEventKeys<TEvents>
+	public async warn<
+		K extends EventKeysByLevel<BuiltinEvents, CoreEventLevel.warning>
 	>(
 		key: K,
-		options?: EmitOptionsForKey<TEvents, K>
+		options?: EmitOptionsForKey<BuiltinEvents, K>
 	) {
-		return this._emit(key, options);
+		return await this._emit(key, options as EmitOptionsForKey<FinalEvents<TEvents>, K> | undefined);
 	}
-
 	/**
-	 * Emit message event (developer-facing)
-	 */
-	public async emitMessage<
-		K extends MessageEventKeys<TEvents>
-	>(
-		key: K,
-		options?: EmitOptionsForKey<TEvents, K>
-	) {
-		return this._emit(key, options);
-	}
-
-	/**
-	 * Generic emit method
+	 * Emit builtin terminal event and terminate execution.
 	 *
-	 * TODO: split into signal/message APIs
+	 * The trailing `throw` is only a TypeScript `never` guard. Runtime
+	 * termination is driven by the terminal event pipeline itself.
 	 */
-	public async emit<K extends keyof FinalEvents<TEvents>>(
+	public throw<
+		K extends TerminalEventKeys<BuiltinEvents>
+	>(
+		key: K,
+		options?: EmitOptionsForKey<BuiltinEvents, K>
+	): never {
+		this._emit(key, options as EmitOptionsForKey<FinalEvents<TEvents>, K> | undefined);
+		throw new Error('This Error is never processed, its a TS guard');
+	}
+
+	public signalThrow<
+		K extends TerminalSignalKeys<TEvents>
+	>(
+		key: K,
+		options?: EmitOptionsForEvent<TEvents[K]> | undefined
+	): never {
+		this._emit(key, options as EmitOptionsForEvent<TEvents[K]> | undefined)
+		throw new Error('This Error is never processed, its a TS guard');
+	}
+	public messageThrow<
+		K extends TerminalMessageKeys<TEvents>
+	>(
+		key: K,
+		options?: EmitOptionsForEvent<TEvents[K]> | undefined
+	): never {
+		this._emit(key, options as EmitOptionsForEvent<TEvents[K]> | undefined)
+		throw new Error('This Error is never processed, its a TS guard');
+	}
+
+	/**
+	 * Emit custom non-terminal signal events.
+	 */
+	public async signalTrace<
+		K extends EventKeysByKindAndLevel<TEvents, CoreEventKind.signal, CoreEventLevel.trace>
+	>(
 		key: K,
 		options?: EmitOptionsForKey<TEvents, K>
-	): Promise<RuntimeCoreEvent<TEvents[K]["code"]> | undefined> {
-		return this._emit(key, options);
+	) {
+		return await this._emit(key, options as EmitOptionsForEvent<TEvents[K]> | undefined)
+	}
+
+	public async signalDebug<
+		K extends EventKeysByKindAndLevel<TEvents, CoreEventKind.signal, CoreEventLevel.debug>
+	>(
+		key: K,
+		options?: EmitOptionsForKey<TEvents, K>
+	) {
+		return await this._emit(key, options as EmitOptionsForEvent<TEvents[K]> | undefined)
+	}
+
+	public async signalInfo<
+		K extends EventKeysByKindAndLevel<TEvents, CoreEventKind.signal, CoreEventLevel.info>
+	>(
+		key: K,
+		options?: EmitOptionsForKey<TEvents, K>
+	) {
+		return await this._emit(key, options as EmitOptionsForEvent<TEvents[K]> | undefined)
+	}
+
+	public async signalWarn<
+		K extends EventKeysByKindAndLevel<TEvents, CoreEventKind.signal, CoreEventLevel.warning>
+	>(
+		key: K,
+		options?: EmitOptionsForKey<TEvents, K>
+	) {
+		return await this._emit(key, options as EmitOptionsForEvent<TEvents[K]> | undefined)
+	}
+	/**
+	 * Emit custom non-terminal message events.
+	 */
+	public async messageTrace<
+		K extends EventKeysByKindAndLevel<TEvents, CoreEventKind.message, CoreEventLevel.trace>
+	>(
+		key: K,
+		options?: EmitOptionsForKey<TEvents, K>
+	) {
+		return await this._emit(key, options as EmitOptionsForEvent<TEvents[K]> | undefined)
+	}
+
+	public async messageDebug<
+		K extends EventKeysByKindAndLevel<TEvents, CoreEventKind.message, CoreEventLevel.debug>
+	>(
+		key: K,
+		options?: EmitOptionsForKey<TEvents, K>
+	) {
+		return await this._emit(key, options as EmitOptionsForEvent<TEvents[K]> | undefined)
+	}
+
+	public async messageInfo<
+		K extends EventKeysByKindAndLevel<TEvents, CoreEventKind.message, CoreEventLevel.info>
+	>(
+		key: K,
+		options?: EmitOptionsForKey<TEvents, K>
+	) {
+		return await this._emit(key, options as EmitOptionsForEvent<TEvents[K]> | undefined)
+	}
+
+	public async messageWarn<
+		K extends EventKeysByKindAndLevel<TEvents, CoreEventKind.message, CoreEventLevel.warning>
+	>(
+		key: K,
+		options?: EmitOptionsForKey<TEvents, K>
+	) {
+		return await this._emit(key, options as EmitOptionsForEvent<TEvents[K]> | undefined)
 	}
 
 	/**

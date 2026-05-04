@@ -8,14 +8,14 @@
 // - Requires EventsManager to be properly initialized
 // - Misconfigured flows can break runtime progression
 
-import { Engine } from "@abstracts";
 import { Context } from "@contexts";
 import {
 	CoreEventsShape,
 	CoreGlobalsShape,
 	CoreModulesShape,
 	CoreStagesShape,
-	CoreTranslationsShape
+	CoreTranslationsShape,
+	EngineState
 } from "@types";
 
 /**
@@ -24,19 +24,24 @@ import {
  * Event-driven engine implementation.
  *
  * Instead of executing phases sequentially,
- * it registers listeners that react to lifecycle events.
+ * it registers flow listeners that react to lifecycle events carrying
+ * `trigger: true`.
  *
  * Flow:
- * runtimeInit → bootstrapReady → stageReady → globalsReady → actionReady → runtimeReady → runner
+ * runtimeInit → bootstrapReady → stageReady → globalsReady → modulesReady → runtimeReady → runner(action)
  *
  * Responsibilities:
- * - Register flow listeners
- * - Delegate lifecycle progression to EventsManager
- * - Trigger runner at the end of the flow
+ * - Register flow listeners before runtime starts
+ * - Delegate lifecycle progression to EventsManager + RuntimeService
+ * - Trigger the final action runner at the end of the flow
+ * - Do only the flow orchestration explicitly expected by the core
  *
  * Non-responsibilities:
  * - No direct sequential execution
  * - No manual lifecycle chaining
+ * - No passive output listener management
+ * - No extra runtime behavior beyond the core-defined flow graph
+ * - No custom business logic owned by the engine itself
  *
  * @template TEvents
  * @template TStages
@@ -50,77 +55,95 @@ export class FedEngine<
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape
-> extends Engine<TEvents, TStages, TGlobals, TModules, TTranslations> {
+> {
+
+	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private _state: EngineState = "idle";
+	private _runner: () => Promise<void> | void
 
 	constructor(
-		protected readonly ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>,
-		protected readonly runner: () => Promise<void> | void
+		ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>,
+		runner: () => Promise<void> | void
 	) {
-		super(ctx, runner);
+		this._ctx = ctx;
+		this._runner = runner;
+	}
+
+	private _setState(next: EngineState): void {
+		this._state = next;
 	}
 
 	/**
-	 * Initializes the event-driven flow and starts runtime.
+	 * Return the current engine execution state.
+	 */
+	public getState(): EngineState {
+		return this._state;
+	}
+
+	/**
+	 * Initialize the FED flow graph and start runtime from its entrypoint.
+	 *
+	 * Unlike the standard engine, only the first runtime phase is called
+	 * directly here. The remaining phases are reached through flow events.
 	 */
 	async run() {
 		await this._registerFlow();
 
-		this.setState('running');
+		this._setState('running');
 
 		// Entry point of the flow
-		await this.ctx.runtime.setInit();
+		await this._ctx.runtime.setInit();
 	}
 
 	/**
 	 * Registers all lifecycle event listeners.
 	 *
-	 * Each listener triggers the next runtime phase.
+	 * Each listener advances exactly one runtime step when the corresponding
+	 * flow event is emitted by the core.
+	 *
+	 * This method defines the builtin FED graph for the current runtime:
+	 * `runtimeInit` → `bootstrapReady` → `stageReady` → `globalsReady` →
+	 * `modulesReady` → `runtimeReady` → final action runner.
 	 */
 	private async _registerFlow() {
-		const events = this.ctx.events;
+		const events = this._ctx.events;
 
 		events.registerFlowListener("runtimeInit", {
 			handler: async () => {
-				await this.ctx.runtime.setBootstrap();
-			},
-			channel: "default"
+				await this._ctx.runtime.setBootstrap();
+			}
 		});
 
 		events.registerFlowListener("bootstrapReady", {
 			handler: async () => {
-				await this.ctx.runtime.setStage();
-			},
-			channel: "default"
+				await this._ctx.runtime.setStage();
+			}
 		});
 
 		events.registerFlowListener("stageReady", {
 			handler: async () => {
-				await this.ctx.runtime.setGlobals();
-			},
-			channel: "default"
+				await this._ctx.runtime.setGlobals();
+			}
 		});
 
 		events.registerFlowListener("globalsReady", {
 			handler: async () => {
-				await this.ctx.runtime.setAction();
-			},
-			channel: "default"
+				await this._ctx.runtime.setModules();
+			}
 		});
 
-		events.registerFlowListener("actionReady", {
+		events.registerFlowListener("modulesReady", {
 			handler: async () => {
-				await this.ctx.runtime.setReady();
-			},
-			channel: "default"
+				await this._ctx.runtime.setReady();
+			}
 		});
 
 		events.registerFlowListener("runtimeReady", {
 			handler: async () => {
-				await this.runner();
-			},
-			channel: "default"
+				await this._runner();
+			}
 		});
 
-		this.setState('done');
+		this._setState('done');
 	}
 }

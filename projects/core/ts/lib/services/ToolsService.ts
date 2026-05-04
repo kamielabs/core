@@ -1,8 +1,5 @@
-import { Service } from "@abstracts";
 import {
 	Context,
-	EmitMessageHookMethod,
-	EmitSignalHookMethod,
 	ToolsActionContext,
 	ToolsGlobalsContext,
 	ToolsStageContext
@@ -69,27 +66,38 @@ export class ToolsService<
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape
 
-> extends Service<
-	TEvents, TStages, TGlobals, TModules, TTranslations
 > {
 
+	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
 	/**
 	 * Constructor.
 	 *
 	 * @param ctx - Global execution context
 	 */
-	constructor(protected readonly ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>) {
-		super(ctx);
+	constructor(ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>) {
+		this._ctx = ctx;
 	}
+
+	public init: () => Promise<void> = async (): Promise<void> => { };
 
 	/**
 	 * Tools available in stage hooks.
 	 *
-	 * Limited to signal emission.
+	 * Exposes:
+	 * - signal emission
+	 * - `setCwd` placeholder (currently a no-op)
+	 *
+	 * Stage hooks intentionally do not receive message emission capabilities.
 	 */
 	public stageContext(): ToolsStageContext<TEvents, TStages, TGlobals, TModules, TTranslations> {
 		return {
-			signal: (key, options) => this.signal(key, options),
+			signal: {
+				trace: (key, options) => this._ctx.events.signalTrace(key, options),
+				debug: (key, options) => this._ctx.events.signalDebug(key, options),
+				info: (key, options) => this._ctx.events.signalInfo(key, options),
+				warn: (key, options) => this._ctx.events.signalWarn(key, options),
+				throw: (key, options) => this._ctx.events.signalThrow(key, options),
+			},
 			setCwd: () => { }
 		}
 	}
@@ -100,13 +108,28 @@ export class ToolsService<
 	 * Includes:
 	 * - signal
 	 * - message
-	 * - addListener (attach output listeners)
+	 * - addListener (attach output listeners only)
+	 *
+	 * `addListener()` delegates to the runtime output layer and does not expose
+	 * flow or system listener registration.
 	 */
 	public globalsContext(): ToolsGlobalsContext<TEvents, TStages, TGlobals, TModules, TTranslations> {
 		return {
-			signal: (key, options) => this.signal(key, options),
-			message: (key, options) => this.message(key, options),
-			addListener: (handler) => this.ctx.events.setOutputListener(handler)
+			signal: {
+				trace: (key, options) => this._ctx.events.signalTrace(key, options),
+				debug: (key, options) => this._ctx.events.signalDebug(key, options),
+				info: (key, options) => this._ctx.events.signalInfo(key, options),
+				warn: (key, options) => this._ctx.events.signalWarn(key, options),
+				throw: (key, options) => this._ctx.events.signalThrow(key, options),
+			},
+			message: {
+				trace: (key, options) => this._ctx.events.messageTrace(key, options),
+				debug: (key, options) => this._ctx.events.messageDebug(key, options),
+				info: (key, options) => this._ctx.events.messageInfo(key, options),
+				warn: (key, options) => this._ctx.events.messageWarn(key, options),
+				throw: (key, options) => this._ctx.events.messageThrow(key, options),
+			},
+			addListener: (handler) => this._ctx.events.setOutputListener(handler)
 		}
 	}
 
@@ -116,11 +139,26 @@ export class ToolsService<
 	 * Includes:
 	 * - signal
 	 * - message
+	 *
+	 * This context intentionally mirrors the action-level event API,
+	 * without output listener registration.
 	 */
 	public moduleContext(): ToolsActionContext<TEvents, TStages, TGlobals, TModules, TTranslations> {
 		return {
-			signal: (key, options) => this.signal(key, options),
-			message: (key, options) => this.message(key, options),
+			signal: {
+				trace: (key, options) => this._ctx.events.signalTrace(key, options),
+				debug: (key, options) => this._ctx.events.signalDebug(key, options),
+				info: (key, options) => this._ctx.events.signalInfo(key, options),
+				warn: (key, options) => this._ctx.events.signalWarn(key, options),
+				throw: (key, options) => this._ctx.events.signalThrow(key, options),
+			},
+			message: {
+				trace: (key, options) => this._ctx.events.messageTrace(key, options),
+				debug: (key, options) => this._ctx.events.messageDebug(key, options),
+				info: (key, options) => this._ctx.events.messageInfo(key, options),
+				warn: (key, options) => this._ctx.events.messageWarn(key, options),
+				throw: (key, options) => this._ctx.events.messageThrow(key, options),
+			},
 		};
 	}
 
@@ -130,39 +168,28 @@ export class ToolsService<
 	 * Includes:
 	 * - signal
 	 * - message
+	 *
+	 * This is the broadest stable hook tool surface currently exposed by the core.
 	 */
 	public actionContext(): ToolsActionContext<TEvents, TStages, TGlobals, TModules, TTranslations> {
 		return {
-			signal: (key, options) => this.signal(key, options),
-			message: (key, options) => this.message(key, options),
+			signal: {
+				trace: (key, options) => this._ctx.events.signalTrace(key, options),
+				debug: (key, options) => this._ctx.events.signalDebug(key, options),
+				info: (key, options) => this._ctx.events.signalInfo(key, options),
+				warn: (key, options) => this._ctx.events.signalWarn(key, options),
+				throw: (key, options) => this._ctx.events.signalThrow(key, options),
+			},
+			message: {
+				trace: (key, options) => this._ctx.events.messageTrace(key, options),
+				debug: (key, options) => this._ctx.events.messageDebug(key, options),
+				info: (key, options) => this._ctx.events.messageInfo(key, options),
+				warn: (key, options) => this._ctx.events.messageWarn(key, options),
+				throw: (key, options) => this._ctx.events.messageThrow(key, options),
+			},
 		};
 	}
 
-	// -----------------------------------------------------
-	// INTERNAL TOOL IMPLEMENTATIONS
-	// -----------------------------------------------------
-
-	/**
-	 * Emit custom signal event.
-	 *
-	 * Delegates to EventsManager.emitSignal.
-	 */
-	private signal: EmitSignalHookMethod<
-		TEvents, TStages, TGlobals, TModules, TTranslations
-	> = (key, options) => {
-		return this.ctx.events.emitSignal(key, options);
-	}
-
-	/**
-	 * Emit custom message event.
-	 *
-	 * Delegates to EventsManager.emitMessage.
-	 */
-	private message: EmitMessageHookMethod<
-		TEvents, TStages, TGlobals, TModules, TTranslations
-	> = (key, options) => {
-		return this.ctx.events.emitMessage(key, options);
-	}
 
 	/**
 	 * Future extension point:

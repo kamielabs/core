@@ -1,4 +1,3 @@
-// TODO: V0.1 — CORE_STATES integration may require validation hooks alignment with EventsManager
 // NOTE: Builders Role
 // - Builders perform lightweight pre-checks only (e.g. duplicate prevention with builtins)
 // - Full validation (format, indexing, invariants) MUST be done in the corresponding Manager (EventsManager)
@@ -23,6 +22,12 @@ import { CoreEventsShape } from "@types";
  *
  * Merges built-in events with user-defined custom events.
  *
+ * Lifecycle position:
+ * - executed during `CLI.init()` static bootstrap
+ * - runs before managers exist
+ * - cannot rely on the core event system yet
+ * - therefore reports failures through `CoreError` only
+ *
  * Responsibilities:
  * - Prevent overriding of built-in events
  * - Perform shallow merge
@@ -34,6 +39,10 @@ import { CoreEventsShape } from "@types";
  * - No runtime guarantees
  *
  * These are handled later by the EventsManager during initialization.
+ *
+ * Architectural note:
+ * - unlike the other builders, this one is expected to remain relevant longer
+ *   because events are the first real runtime brick of the core
  *
  * @template TCustom - Custom events shape
  * @param custom - Optional custom events definition
@@ -48,16 +57,54 @@ export function buildEvents<TCustom extends CoreEventsShape = {}>(custom?: TCust
 	 *
 	 * Invariant:
 	 * - Built-in events are immutable and cannot be shadowed
+	 * - 'CORE_' namespace is reserved for internal events
 	 */
+	const keyIndex = new Set<string>();
+	const nameIndex = new Set<string>();
+	// 1. index builtins
+	for (const [key, evt] of Object.entries(BUILTIN_EVENTS) as [
+		keyof typeof BUILTIN_EVENTS,
+		(typeof BUILTIN_EVENTS)[keyof typeof BUILTIN_EVENTS]
+	][]) {
+		keyIndex.add(key as string);
+		nameIndex.add(evt.name);
+	}
+
 	if (custom) {
+		// 2. validate customs
 		for (const key in custom) {
-			if (key in BUILTIN_EVENTS) {
+			const evt = custom[key];
+			if (!evt) continue;
+
+			const { name } = evt;
+
+			// 🔒 Builtin Key collision
+			if (keyIndex.has(key)) {
 				throw new CoreError(
-					"EVENT_DUPLICATE",
-					"EventsBuilder.buildEvents",
-					`Event "${key}" already exists in builtins (override forbidden)`
+					'eventDuplicatedKey',
+					`Event key "${key}" already exists`
 				);
 			}
+
+			// 🔒 Builtin Name collision
+			if (nameIndex.has(name)) {
+				throw new CoreError(
+					'eventDuplicatedName',
+					`Event name "${name}" already exists`
+				);
+			}
+
+			// 🔒 Reserved namespace
+			if (name.startsWith('CORE_')) {
+				throw new CoreError(
+					'eventNamespace',
+					`Event "${key}" cannot use reserved namespace 'CORE_'`
+				);
+			}
+
+			// register
+			keyIndex.add(key);
+			nameIndex.add(name);
 		}
 	}
 
@@ -69,7 +116,7 @@ export function buildEvents<TCustom extends CoreEventsShape = {}>(custom?: TCust
 	const merged = {
 		...BUILTIN_EVENTS,
 		...(custom ?? {})
-	};
+	} as const;
 
 	/**
 	 * Type assertion ensures:

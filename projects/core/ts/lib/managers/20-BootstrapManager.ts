@@ -1,6 +1,4 @@
 import { dirname } from "node:path"; // Put this in providers ??
-
-import { ResolverManager } from "@abstracts";
 import { Context } from "@contexts";
 import {
 	CoreEventsShape,
@@ -17,14 +15,15 @@ import {
  * First resolution step of the core runtime.
  *
  * Responsibilities:
- * - Extract raw execution context from Node.js
- * - Normalize CLI invocation data (argv, script, cwd)
- * - Expose environment variables
+ * - Extract raw execution context from the active Node.js process
+ * - Copy and normalize CLI invocation data (argv, script, cwd)
+ * - Copy and expose environment variables in a uniform runtime shape
  *
  * Important:
  * - This is the VERY FIRST runtime resolver
  * - No dependency on other managers
  * - No parsing logic here (pure data extraction)
+ * - All downstream managers rely on this normalized bootstrap snapshot
  *
  * Lifecycle:
  * - Called during runtime.setBootstrap()
@@ -34,11 +33,11 @@ import {
  * Design philosophy:
  * - Deterministic
  * - Zero external dependency
- * - Platform-agnostic (for now)
+ * - Linux / shell-oriented for v0.1
  *
  * Notes:
- * - Current implementation is minimal (v0.1)
- * - Will evolve into a full platform/shell abstraction layer
+ * - Current implementation targets the initial Node.js + shell runtime only
+ * - It is expected to evolve later into a platform/shell abstraction layer
  */
 export class BootstrapManager<
 	TEvents extends CoreEventsShape,
@@ -46,34 +45,62 @@ export class BootstrapManager<
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape
-> extends ResolverManager<RuntimeCoreFacts, TEvents, TStages, TGlobals, TModules, TTranslations> {
+> {
 
-	constructor(protected readonly ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>) {
-		super(ctx);
+	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private _resolved?: RuntimeCoreFacts
+
+	constructor(ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>) {
+		this._ctx = ctx;
+	}
+
+	public init: () => Promise<void> = async (): Promise<void> => { };
+
+	/**
+	 * Freeze and persist the normalized bootstrap runtime facts.
+	 */
+	private _setResolved(state: RuntimeCoreFacts): void | never {
+		if (this._resolved) {
+			this._ctx.events.throw('bootstrapAlreadyResolved');
+		}
+		this._resolved = this._ctx.helpers.core.deepClone(state);
+		this._resolved = this._ctx.helpers.core.deepFreeze(this._resolved);
+	}
+
+	public getResolved(): RuntimeCoreFacts {
+		if (!this._resolved) {
+			this._ctx.events.throw('bootstrapMissingResolved');
+		}
+		return this._resolved!;
 	}
 
 	/**
-	 * Resolve bootstrap facts
+	 * Indicates if state is resolved.
+	 */
+	public isResolved(): boolean {
+		return !!this._resolved;
+	}
+
+	/**
+	 * Resolve bootstrap facts.
 	 *
 	 * Steps:
-	 * 1. Emit bootstrap initialization event
-	 * 2. Load raw runtime data
-	 * 3. Store resolved facts in RuntimeService
+	 * 1. Read process-backed runtime inputs
+	 * 2. Normalize them into RuntimeCoreFacts
+	 * 3. Freeze the snapshot for downstream managers
 	 *
 	 * Notes:
 	 * - No validation here
-	 * - No transformation beyond minimal normalization
+	 * - No parsing here
+	 * - Only minimal normalization of the active process/shell context
 	 */
 	public async resolve(): Promise<void> {
-		await this.ctx.events.internalEmit('bootstrapInit', {
-			details: ["System:", "Gentoo Linux"]
-		});
-
-		this.setResolved(this._load());
+		// We can setup a test here and throw a fatal event if needed, rn its not, we keep it as it.
+		this._setResolved(this._load());
 	}
 
 	/**
-	 * Load raw execution environment
+	 * Load the active process execution environment.
 	 *
 	 * Extracts:
 	 * - Node binary path
@@ -86,11 +113,12 @@ export class BootstrapManager<
 	 * - No external dependencies
 	 * - No side effects
 	 * - Fully synchronous
+	 * - Current implementation assumes the initial Linux/shell runtime model
 	 *
 	 * Output:
 	 * - RuntimeCoreFacts (immutable runtime snapshot)
 	 *
-	 * This method defines the ROOT of runtime truth.
+	 * This method defines the root runtime snapshot later reused by all other managers.
 	 */
 	private _load(): RuntimeCoreFacts {
 

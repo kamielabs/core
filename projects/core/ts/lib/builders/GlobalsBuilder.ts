@@ -1,4 +1,3 @@
-// TODO: V0.1 — CORE_STATES integration may impact Globals validation flow
 // NOTE: Builders Role
 // - Builders perform minimal checks only
 // - Full validation (structure, duplicates, indexing) is handled by GlobalsManager
@@ -17,6 +16,12 @@ import { CoreError } from "@helpers";
  *
  * Merges built-in globals with user-defined globals.
  *
+ * Lifecycle position:
+ * - executed during `CLI.init()` static bootstrap
+ * - runs before managers exist
+ * - cannot rely on the core event system yet
+ * - therefore reports failures through `CoreError` only
+ *
  * Responsibilities:
  * - Prevent usage of reserved "core" namespace
  * - Perform shallow merge
@@ -28,6 +33,10 @@ import { CoreError } from "@helpers";
  * - No duplicate detection at option level
  *
  * These are handled by GlobalsManager during initialization.
+ *
+ * Architectural note:
+ * - this builder is expected to disappear with RFC-0002 once validation/indexing
+ *   fully moves into manager initialization
  *
  * @template TCustomGlobals - Custom globals shape
  * @param custom - Optional custom globals definition
@@ -54,8 +63,7 @@ export function buildGlobals<TCustomGlobals extends CoreGlobalsShape = {}>(
 	 */
 	if (custom && "core" in custom) {
 		throw new CoreError(
-			"GLOBAL_RESERVED_NAMESPACE",
-			"GlobalsBuilder.buildGlobals",
+			"globalsNamespace",
 			`"core" namespace is reserved and cannot be defined in custom globals`
 		);
 	}

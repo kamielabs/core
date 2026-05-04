@@ -12,8 +12,14 @@ import {
 	RuntimeCoreFacts,
 	RuntimeStageFacts
 } from "@types";
-import { EmitSignalHookMethod } from "./10-EventsContext";
-import { SnapshotFullContext } from "./20-SnapshotContext";
+import {
+	SignalDebugHookMethod,
+	SignalInfoHookMethod,
+	SignalThrowHookMethod,
+	SignalTraceHookMethod,
+	SignalWarnHookMethod,
+	SnapshotFullContext
+} from "@contexts";
 import { StagesManager } from "@managers";
 
 /**
@@ -39,9 +45,15 @@ export type ToolsStageContext<
 	 * Can be used for:
 	 * - logging
 	 * - warnings
-	 * - fatal errors (depending on event level)
+	 * - terminal errors (depending on event level)
 	 */
-	signal: EmitSignalHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	signal: {
+		trace: SignalTraceHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		debug: SignalDebugHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		info: SignalInfoHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		warn: SignalWarnHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		throw: SignalThrowHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	};
 
 	/**
 	 * Set working directory (planned feature).
@@ -82,7 +94,7 @@ export type RuntimeStageContext = {
  * - resolved options
  * - runtime facts
  * - tools
- * - snapshot of full system
+ * - snapshot of the full resolved system state
  */
 export type StageHookContext<
 	TEvents extends CoreEventsShape,

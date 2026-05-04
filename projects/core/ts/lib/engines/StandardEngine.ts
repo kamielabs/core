@@ -8,14 +8,14 @@
 // - RuntimeService is responsible for all state transitions
 // - Engine only orchestrates phase order
 
-import { Engine } from "@abstracts";
 import { Context } from "@contexts";
 import {
 	CoreEventsShape,
 	CoreGlobalsShape,
 	CoreModulesShape,
 	CoreStagesShape,
-	CoreTranslationsShape
+	CoreTranslationsShape,
+	EngineState
 } from "@types";
 
 /**
@@ -23,23 +23,32 @@ import {
  *
  * Default engine implementation using a linear execution model.
  *
+ * Execution model:
+ * - procedural
+ * - explicit phase calls
+ * - no flow-listener registration
+ *
  * Lifecycle:
  * 1. init
  * 2. bootstrap
  * 3. stage
  * 4. globals
- * 5. action
+ * 5. modules
  * 6. ready
- * 7. runner execution
+ * 7. runner execution (action)
  *
  * Responsibilities:
  * - Execute runtime phases in strict order
- * - Delegate all state transitions to RuntimeService
- * - Trigger final runner execution
+ * - Delegate all phase transitions to RuntimeService via direct `set*()` calls
+ * - Trigger final runner execution once runtime is fully ready
+ * - Do only the orchestration explicitly expected by the core
  *
  * Non-responsibilities:
  * - No event orchestration
  * - No async flow chaining beyond sequencing
+ * - No FED trigger/listener behavior
+ * - No extra runtime behavior beyond the core-defined phase chain
+ * - No custom business logic owned by the engine itself
  *
  * @template TEvents
  * @template TStages
@@ -53,33 +62,57 @@ export class StandardEngine<
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape
-> extends Engine<TEvents, TStages, TGlobals, TModules, TTranslations> {
+> {
+
+	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private _state: EngineState = "idle";
+	private _runner: () => Promise<void> | void
 
 	constructor(
-		protected readonly ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>,
-		protected readonly runner: () => Promise<void> | void
+		ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>,
+		runner: () => Promise<void> | void
 	) {
-		super(ctx, runner);
+		this._ctx = ctx;
+		this._runner = runner;
+	}
+
+
+	/**
+	 * Update the internal engine state.
+	 */
+	private _setState(next: EngineState): void {
+		this._state = next;
 	}
 
 	/**
-	 * Executes the full runtime lifecycle sequentially.
+	 * Return the current engine execution state.
+	 */
+	public getState(): EngineState {
+		return this._state;
+	}
+
+	/**
+	 * Execute the full runtime lifecycle sequentially.
+	 *
+	 * Order is entirely procedural:
+	 * `setInit()` → `setBootstrap()` → `setStage()` → `setGlobals()` →
+	 * `setModules()` → `setReady()` → final runner.
 	 */
 	public async run() {
-		this.setState('running');
+		this._setState('running');
 
 		// Runtime lifecycle (linear execution)
-		await this.ctx.runtime.setInit();
-		await this.ctx.runtime.setBootstrap();
-		await this.ctx.runtime.setStage();
-		await this.ctx.runtime.setGlobals();
-		await this.ctx.runtime.setAction();
-		await this.ctx.runtime.setReady();
+		await this._ctx.runtime.setInit();
+		await this._ctx.runtime.setBootstrap();
+		await this._ctx.runtime.setStage();
+		await this._ctx.runtime.setGlobals();
+		await this._ctx.runtime.setModules();
+		await this._ctx.runtime.setReady();
 
 		// Execute final action
-		await this.runner();
+		await this._runner();
 
-		this.setState('done');
+		this._setState('done');
 
 		// TODO: Emit engine.exit event
 	}

@@ -1,7 +1,7 @@
 // ⚙️ Auto-generated file — DO NOT EDIT
 
 export * from "./00-CLIBase";
-export * from "./10-EventsTypes";
+export * from "./10-EventsType";
 export * from "./20-I18nTypes";
 export * from "./30-BootstrapTypes";
 export * from "./40-StagesTypes";

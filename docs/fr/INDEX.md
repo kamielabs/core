@@ -74,7 +74,7 @@ main()
 - [LIFECYCLE](./arch/LIFECYCLE.md)
 - [ENGINES](./arch/ENGINES.md)
 - [HOOKING] -> TODO
-- [CORE_STATES] -> TODO
+- [CORE_STATES](./arch/CORE_STATES.md)
 
 ---
 

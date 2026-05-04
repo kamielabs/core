@@ -19,8 +19,16 @@ import {
 } from "@types";
 
 import {
-	EmitMessageHookMethod,
-	EmitSignalHookMethod,
+	MessageDebugHookMethod,
+	MessageInfoHookMethod,
+	MessageThrowHookMethod,
+	MessageTraceHookMethod,
+	MessageWarnHookMethod,
+	SignalDebugHookMethod,
+	SignalInfoHookMethod,
+	SignalThrowHookMethod,
+	SignalTraceHookMethod,
+	SignalWarnHookMethod,
 	SnapshotFullContext
 } from "@contexts";
 
@@ -65,6 +73,23 @@ export type RuntimeFullContext = RuntimeFullFacts;
  *
  * These tools are the ONLY allowed mutation surface.
  */
+// export type ToolsActionContext<
+// 	TEvents extends CoreEventsShape,
+// 	TStages extends CoreStagesShape,
+// 	TGlobals extends CoreGlobalsShape,
+// 	TModules extends CoreModulesShape,
+// 	TTranslations extends CoreTranslationsShape
+// > = {
+// 	/**
+// 	 * Emit a signal event.
+// 	 */
+// 	signal: EmitSignalHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+//
+// 	/**
+// 	 * Emit a user-facing message.
+// 	 */
+// 	message: EmitMessageHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+// }
 export type ToolsActionContext<
 	TEvents extends CoreEventsShape,
 	TStages extends CoreStagesShape,
@@ -75,12 +100,23 @@ export type ToolsActionContext<
 	/**
 	 * Emit a signal event.
 	 */
-	signal: EmitSignalHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-
+	signal: {
+		trace: SignalTraceHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		debug: SignalDebugHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		info: SignalInfoHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		warn: SignalWarnHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		throw: SignalThrowHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	};
 	/**
 	 * Emit a user-facing message.
 	 */
-	message: EmitMessageHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	message: {
+		trace: MessageTraceHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		debug: MessageDebugHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		info: MessageInfoHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		warn: MessageWarnHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		throw: MessageThrowHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	};
 }
 
 /**

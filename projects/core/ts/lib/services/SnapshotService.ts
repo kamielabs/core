@@ -1,4 +1,3 @@
-import { Service } from "@abstracts";
 import {
 	Context,
 	SnapshotFullContext
@@ -64,40 +63,40 @@ export class SnapshotService<
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape
-> extends Service<
-	TEvents, TStages, TGlobals, TModules, TTranslations
 > {
 
+	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
 	/**
 	 * Constructor.
 	 *
 	 * @param ctx - Global execution context
 	 */
-	constructor(protected readonly ctx: Context<
+	constructor(ctx: Context<
 		TEvents, TStages, TGlobals, TModules, TTranslations
 	>) {
-		super(ctx);
+		this._ctx = ctx;
 	}
 
+	public init: () => Promise<void> = async (): Promise<void> => { };
 	/**
 	 * Return full snapshot of core declarations.
 	 *
 	 * Behavior:
 	 * - Aggregates all manager dictionaries into a single object
 	 * - Provides read-only access to declared structures
-	 * - Safe to call at any time during lifecycle
+	 * - Intended to be called once the core context has been initialized
 	 *
 	 * @returns SnapshotFullContext
 	 */
 	public snapshotContext(): SnapshotFullContext<TEvents, TStages, TGlobals, TModules, TTranslations> {
 
 		const snap: SnapshotFullContext<TEvents, TStages, TGlobals, TModules, TTranslations> = {
-			settings: this.ctx.settings,
-			events: this.ctx.events.getDict(),
-			stages: this.ctx.stages.getDict().stages,
-			i18n: this.ctx.i18n.getDict().translations,
-			globals: this.ctx.globals.getDict().options,
-			modules: this.ctx.modules.getDict().modules,
+			settings: this._ctx.settings,
+			events: this._ctx.events.getEvents(),
+			stages: this._ctx.stages.getDict().stages,
+			i18n: this._ctx.i18n.getDict().translations,
+			globals: this._ctx.globals.getDict().options,
+			modules: this._ctx.modules.getDict().modules,
 		}
 
 		return snap

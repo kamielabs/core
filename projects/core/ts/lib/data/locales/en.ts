@@ -1,70 +1,60 @@
 import { CoreMessagesShape } from "@types";
 
+/**
+ * Builtin English message dictionary.
+ *
+ * Current role:
+ * - base builtin i18n reference used by the core
+ *
+ * Forward-compat note:
+ * - message `code` values are expected to become event `name` references
+ * - they must stay aligned with builtin events declared as `kind: message`
+ */
 export const BUILTIN_EN_MESSAGES = {
 	parserInit: {
-		code: 'CORE_EVENT_PARSER_INIT',
-		title: 'Parser Init',
-		description: ''
+		code: 'CORE_PARSER_INIT',
+		content: 'Parser Init'
 	},
-	parsingDone: {
-		code: 'CORE_EVENT_PARSING_DONE',
-		title: 'Parser Ready !',
-		description: '',
+	parserInvalidPhase: {
+		code: 'CORE_PARSER_INVALID_PHASE',
+		content: 'Parser Invalid Phase !',
 	},
-	parserFatal: {
-		code: "CORE_EVENT_PARSER_FATAL",
-		title: 'Parser Fatal Error !',
-		description: '',
+	parserReady: {
+		code: 'CORE_PARSER_READY',
+		content: 'Parser Ready !'
 	},
-
+	stageReady: {
+		code: 'CORE_STAGE_READY',
+		content: 'Stage {stage} Ready!'
+	},
 	globalsInit: {
-		code: "CORE_EVENT_GLOBALS_INIT",
-		title: "Global Flags Manager Init",
-		description: "",
+		code: "CORE_GLOBALS_INIT",
+		content: "Global Flags Manager Init"
 	},
 	globalsHooking: {
-		code: "CORE_EVENT_GLOBALS_HOOKING",
-		title: "Global Options Hooking",
-		description: ''
+		code: "CORE_GLOBALS_HOOKING",
+		content: "Global Flags Hooking"
 	},
 	globalsReady: {
-		code: "CORE_EVENT_GLOBALS_READY",
-		title: "Global Flas Manager Ready",
-		description: "global flags parsing done"
-	},
-	globalsFatal: {
-		code: "CORE_EVENT_GLOBALS_FATAL",
-		title: "Globals Flags Manager Fatal Error",
-		description: ""
+		code: "CORE_GLOBALS_READY",
+		title: "Global Flags Manager Ready",
+		description: 'Global Options:\n{globals}'
 	},
 	modulesInit: {
-		code: "CORE_EVENT_MODULES_INIT",
-		title: "Module Parsing Init",
-		description: ""
+		code: "CORE_MODULES_INIT",
+		content: "Module Parsing Init"
+	},
+	modulesHooking: {
+		code: "CORE_MODULES_HOOKING",
+		content: "Module Flags Hooking"
 	},
 	modulesReady: {
-		code: "CORE_EVENT_MODULES_READY",
+		code: "CORE_MODULES_READY",
 		title: "Module Parsing Ready",
 		description: ""
 	},
-	modulesFatal: {
-		code: "CORE_EVENT_MODULES_FATAL",
-		title: "Module Parsing Fatal Error",
-		description: ""
-	},
-	actionInit: {
-		code: "CORE_EVENT_ACTION_INIT",
-		title: "Action Init",
-		description: ""
-	},
-	actionReady: {
-		code: "CORE_EVENT_ACTION_READY",
-		title: "Action ready to be executed",
-		description: ""
-	},
 	runtimeReady: {
-		code: "CORE_EVENT_RUNTIME_READY",
-		title: "Runtime fully resolved, enjoy !",
-		description: ""
+		code: "CORE_RUNTIME_READY",
+		content: "Runtime fully resolved, enjoy !"
 	}
-} satisfies CoreMessagesShape
+} as const satisfies CoreMessagesShape
