@@ -38,14 +38,19 @@ export class CoreError extends Error {
 			code: 'F00100',
 			source: 'Builders.buildEvents'
 		},
+		eventInvalidKey: {
+			name: 'CORE_EVENTS_INVALID_KEY',
+			code: 'F00101',
+			source: 'Builders.buildEvents'
+		},
 		eventDuplicatedKey: {
 			name: 'CORE_EVENTS_DUPLICATE_KEY',
-			code: 'F00101',
+			code: 'F00102',
 			source: 'Builders.buildEvents'
 		},
 		eventDuplicatedName: {
 			name: 'CORE_EVENTS_DUPLICATE_NAME',
-			code: 'F00101',
+			code: 'F00103',
 			source: 'Builders.buildEvents'
 		},
 		stageFileDuplicated: {
@@ -68,9 +73,19 @@ export class CoreError extends Error {
 			code: 'F00303',
 			source: 'Builders.buildStages'
 		},
+		i18nNameSpace: {
+			name: 'CORE_I18N_RESERVED_NAMESPACE',
+			code: 'F00400',
+			source: 'Builders.buildTranslations'
+		},
 		i18nMessageDuplicated: {
 			name: 'CORE_I18N_DUPLICATE_MESSAGE',
-			code: 'F00400',
+			code: 'F00401',
+			source: 'Builders.buildTranslations'
+		},
+		i18nInvalidKey: {
+			name: 'CORE_I18N_INVALID_KEY',
+			code: 'F00402',
 			source: 'Builders.buildTranslations'
 		},
 		globalsNamespace: {

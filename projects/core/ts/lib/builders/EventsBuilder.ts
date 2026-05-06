@@ -14,7 +14,7 @@
 // → Trade-off to evaluate: separation of concerns vs faster init & simpler Managers
 
 import { BUILTIN_EVENTS } from "@data";
-import { CoreError } from "@helpers";
+import { CoreError, CoreHelpers } from "@helpers";
 import { CoreEventsShape } from "@types";
 
 /**
@@ -66,6 +66,23 @@ export function buildEvents<TCustom extends CoreEventsShape = {}>(custom?: TCust
 		keyof typeof BUILTIN_EVENTS,
 		(typeof BUILTIN_EVENTS)[keyof typeof BUILTIN_EVENTS]
 	][]) {
+
+		/**
+		 * Builtin key/name invariant.
+		 */
+		const expected = CoreHelpers.isValidRuntimeName(
+			key as string,
+			evt.name,
+			true
+		);
+
+		if (expected !== evt.name) {
+			throw new CoreError(
+				'eventInvalidKey',
+				`Builtin event "${String(key)}" does not match runtime name "${evt.name}"\n Expected: ${expected}`
+			);
+		}
+
 		keyIndex.add(key as string);
 		nameIndex.add(evt.name);
 	}
@@ -77,6 +94,21 @@ export function buildEvents<TCustom extends CoreEventsShape = {}>(custom?: TCust
 			if (!evt) continue;
 
 			const { name } = evt;
+			/**
+			 * Custom key/name invariant.
+			 */
+			const expected = CoreHelpers.isValidRuntimeName(
+				key,
+				name,
+				false
+			);
+
+			if (expected !== name) {
+				throw new CoreError(
+					'eventInvalidKey',
+					`Custom event "${key}" does not match runtime name "${name}"\n Expected: ${expected}`
+				);
+			}
 
 			// 🔒 Builtin Key collision
 			if (keyIndex.has(key)) {

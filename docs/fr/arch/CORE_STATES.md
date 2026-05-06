@@ -286,7 +286,7 @@ CORE_<CONTEXT>_<STATE>[_DETAIL]
 * **FILE** Utilisé pour les ressources fichiers (NOT_FOUND_FILE, MISSING_FILE)
 * **PROP** Utilisé pour les properties
 * **KEY / KEYS** Utilisé pour les clés de dictionnaire (DUPLICATE_KEY, MISSING_KEYS)
-* **MESSAGE** Utilisé pour les messages i18n ou erreurs utilisateur
+* **BUILTIN_MESSAGE** Utilisé pour signaler qu'un message builtin est absent (cela ne doit jamais arriver en v stable)
 * **NAMESPACE** Utilisé pour les conflits d’espace de nom (RESERVED_NAMESPACE)
 * **DRAFT / RESOLVED** Utilisé pour les états internes de résolution des données
 * **RUNNER** Utilisé pour la résolution du runner dans le core
@@ -401,7 +401,10 @@ Elles constituent un **alias ergonomique** du nom d’event complet.
 | stageDuplicateProp | CORE_STAGE_DUPLICATE_PROP | F00301 | Builders.buildStages | Stage "${stageName}" prop "${propName}" already exists in builtin props | OK |
 | stageMissingFile | CORE_STAGE_MISSING_FILE | F00302 | Builders.buildStages | Custom stage "${stageName}" must declare a "file" | OK |
 | stageMissingLang | CORE_STAGE_MISSING_LANG | F00303 | Builders.buildStages | Custom stage "${stageName}" must declare a "lang" | OK |
-| i18nDuplicateMessage | CORE_I18N_DUPLICATE_MESSAGE | F00400 | Builders.buildTranslations | Translation key "${key}" already exists in builtin lang "${lang}" | OK |
+| i18nNameSpace | CORE_I18N_RESERVED_NAMESPACE | F00400 | Builders.buildTranslations | `Custom translation "${key}" cannot use reserved namespace 'CORE_'` | OK |
+| i18nDuplicateMessage | CORE_I18N_DUPLICATE_MESSAGE | F00401 | Builders.buildTranslations | Translation key "${key}" already exists in builtin lang "${lang}" | OK |
+| i18nInvalidKey | CORE_I18N_INVALID_KEY | F00402 | Builders.buildTranslations | `Builtin translation "${key}" does not match runtime name "${msg.name}"` | OK |
+|                |                       |        |                            |  `Custom translation "${key}" does not match runtime name "${msg.name}"`|    |
 | globalsNamespace | CORE_GLOBALS_RESERVED_NAMESPACE | F00600 | Builders.buildGlobals | "core" namespace is reserved and cannot be defined in custom globals | OK |
 | modulesNamespace | CORE_MODULES_RESERVED_NAMESPACE | F00700 | Builders.buildModules | Module "${key}" is reserved and cannot be overridden | OK |
 | unknownError | CORE_UNKNOWN_ERROR | F99999 | unknown | Fallback unknown core error | LOCKED |
@@ -431,7 +434,7 @@ Elles constituent un **alias ergonomique** du nom d’event complet.
 |i18nMissingLang|CORE_I18N_MISSING_LANG|F?????|fatal|signal|i18n|I18nManager.resolve|false|details: `['en' builtins mandatory]`|OK|
 |i18nUnknownKeys|CORE_I18N_UNKNOWN_KEYS|F?????|fatal|signal|i18n|I18nManager.resolve|false|details: `[lang: unknown_keys]`|OK|
 |i18nMissingKeys|CORE_I18N_MISSING_KEYS|W?????|warning|signal|i18n|I18nManager.resolve|false|details: `[lang: missing_keys]`|OK|
-|i18nMissingMessage|CORE_I18N_MISSING_MESSAGE|W?????|warning|signal|i18n|I18nManager.tr|false|details: `[missing_message: keys]`|OK|
+|i18nMissingBuiltinMessage|CORE_I18N_MISSING_BUILTIN_MESSAGE|F?????|fatal|signal|i18n|I18nManager.tr|false|details: `[missing_message: keys]`|OK|
 |i18nMissingMessageValues|CORE_I18N_MISSING_MESSAGE_VALUES|W?????|warning|signal|i18n|I18nManager.tr|false|details: `[message: values]`|OK|
 |i18nFallbackUsed|CORE_I18N_FALLBACK_USED|W?????|warning|signal|i18n|I18nManager.tr|false|none|OK|
 |parserMissingDraft|CORE_PARSER_MISSING_DRAFT|F?????|fatal|signal|parser|ParserManager.getDraft|false|none|OK|

@@ -128,6 +128,7 @@ export class CLI<
 	 */
 	private _ctx = {
 		settings: {
+			skipI18nWarnings: false,
 			coreConsoleLevel: 'info',
 			engine: 'fed',
 		},
@@ -267,9 +268,12 @@ export class CLI<
 	 * Override default CLI settings.
 	 */
 	private _overrideSettings(settings?: CLISettings) {
-		if (settings && settings.defaultStageName) this._ctx.settings.defaultStageName = settings.defaultStageName;
-		if (settings && settings.engine) this._ctx.settings.engine = settings.engine;
-		if (settings && settings.coreConsoleLevel) this._ctx.settings.coreConsoleLevel = settings.coreConsoleLevel;
+		if (settings !== undefined) {
+			if (settings.defaultStageName !== undefined) this._ctx.settings.defaultStageName = settings.defaultStageName;
+			if (settings.skipI18nWarnings !== undefined) this._ctx.settings.skipI18nWarnings = settings.skipI18nWarnings;
+			if (settings.engine !== undefined) this._ctx.settings.engine = settings.engine;
+			if (settings.coreConsoleLevel !== undefined) this._ctx.settings.coreConsoleLevel = settings.coreConsoleLevel;
+		}
 	}
 
 	/**

@@ -205,4 +205,35 @@ export class CoreHelpers<
 
 		return `${defaultName}(default)`;
 	}
+
+	public static isValidRuntimeName(
+		key: string,
+		name: string,
+		isBuiltin: boolean
+	): string {
+		/**
+		 * Convert camelCase to SCREAMING_SNAKE_CASE
+		 */
+		const normalized = key
+			.replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+			.toUpperCase();
+
+		/**
+		 * Builtin expected format:
+		 * CORE_*
+		 */
+		const expected = isBuiltin
+			? `CORE_${normalized}`
+			: normalized;
+
+		return expected;
+	}
+
+	public isValidRuntimeName(
+		key: string,
+		name: string,
+		isBuiltin: boolean
+	) {
+		return CoreHelpers.isValidRuntimeName(key, name, isBuiltin);
+	}
 }

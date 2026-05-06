@@ -8,8 +8,8 @@ import { FinalTranslations } from "@data";
  * - fallback resolution
  * - console rendering of message events
  */
-export type CoreBaseMessage<Code extends string> = {
-	code: Code;
+export type CoreBaseMessage<Name extends string> = {
+	name: Name;
 }
 
 /**
@@ -21,7 +21,7 @@ export type CoreBaseMessage<Code extends string> = {
  *
  * `content` is explicitly forbidden to keep the two message shapes exclusive.
  */
-export type CoreFullMessage<Code extends string> = CoreBaseMessage<Code> & {
+export type CoreFullMessage<Name extends string> = CoreBaseMessage<Name> & {
 	title: string;
 	description: string;
 	content?: never;
@@ -33,7 +33,7 @@ export type CoreFullMessage<Code extends string> = CoreBaseMessage<Code> & {
  * Used for single-line or direct-content messages.
  * `title` and `description` are explicitly forbidden to keep the union strict.
  */
-export type CoreNormalMessage<Code extends string> = CoreBaseMessage<Code> & {
+export type CoreNormalMessage<Name extends string> = CoreBaseMessage<Name> & {
 	content: string;
 	title?: never;
 	description?: never;
@@ -46,7 +46,7 @@ export type CoreNormalMessage<Code extends string> = CoreBaseMessage<Code> & {
  * - `content`
  * - `title` + `description`
  */
-export type CoreMessage<Code extends string> = CoreNormalMessage<Code> | CoreFullMessage<Code>;
+export type CoreMessage<Name extends string> = CoreNormalMessage<Name> | CoreFullMessage<Name>;
 
 /**
  * Translation dictionary for a single language.
@@ -65,11 +65,12 @@ export type CoreTranslationsShape = Record<string, CoreMessagesShape>
  * Dual translation index built during i18n initialization.
  *
  * - `byLang` is optimized for runtime lookup in the active language
- * - `byCode` is optimized for reverse access by canonical message code
+ * - `byName` is optimized for reverse access by canonical message code
  */
 export type CoreTranslationsIndex = {
 	byLang: Record<string, Record<string, CoreMessage<string>>>;
-	byCode: Record<string, Record<string, CoreMessage<string>>>;
+	byName: Record<string, Record<string, CoreMessage<string>>>;
+	byKey: Record<string, Record<string, CoreMessage<string>>>;
 }
 
 /**
@@ -94,7 +95,4 @@ export type CoreTranslationsDecl<TTranslations extends CoreTranslationsShape> = 
  */
 export type RuntimeI18nFacts = {
 	lang: string
-	fallback: string
-	index: Record<string, CoreMessage<string>>;
-	fallbackIndex: Record<string, CoreMessage<string>>;
 }

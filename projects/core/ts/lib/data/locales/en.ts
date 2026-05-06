@@ -7,54 +7,59 @@ import { CoreMessagesShape } from "@types";
  * - base builtin i18n reference used by the core
  *
  * Forward-compat note:
- * - message `code` values are expected to become event `name` references
+ * - message `name` values are expected to become event `name` references
  * - they must stay aligned with builtin events declared as `kind: message`
  */
 export const BUILTIN_EN_MESSAGES = {
 	parserInit: {
-		code: 'CORE_PARSER_INIT',
+		name: 'CORE_PARSER_INIT',
 		content: 'Parser Init'
 	},
 	parserInvalidPhase: {
-		code: 'CORE_PARSER_INVALID_PHASE',
+		name: 'CORE_PARSER_INVALID_PHASE',
 		content: 'Parser Invalid Phase !',
 	},
 	parserReady: {
-		code: 'CORE_PARSER_READY',
+		name: 'CORE_PARSER_READY',
 		content: 'Parser Ready !'
 	},
 	stageReady: {
-		code: 'CORE_STAGE_READY',
+		name: 'CORE_STAGE_READY',
 		content: 'Stage {stage} Ready!'
 	},
 	globalsInit: {
-		code: "CORE_GLOBALS_INIT",
+		name: "CORE_GLOBALS_INIT",
 		content: "Global Flags Manager Init"
 	},
 	globalsHooking: {
-		code: "CORE_GLOBALS_HOOKING",
+		name: "CORE_GLOBALS_HOOKING",
 		content: "Global Flags Hooking"
 	},
 	globalsReady: {
-		code: "CORE_GLOBALS_READY",
+		name: "CORE_GLOBALS_READY",
 		title: "Global Flags Manager Ready",
 		description: 'Global Options:\n{globals}'
 	},
 	modulesInit: {
-		code: "CORE_MODULES_INIT",
+		name: "CORE_MODULES_INIT",
 		content: "Module Parsing Init"
 	},
 	modulesHooking: {
-		code: "CORE_MODULES_HOOKING",
+		name: "CORE_MODULES_HOOKING",
 		content: "Module Flags Hooking"
 	},
 	modulesReady: {
-		code: "CORE_MODULES_READY",
+		name: "CORE_MODULES_READY",
 		title: "Module Parsing Ready",
 		description: ""
 	},
 	runtimeReady: {
-		code: "CORE_RUNTIME_READY",
+		name: "CORE_RUNTIME_READY",
 		content: "Runtime fully resolved, enjoy !"
+	},
+	modulesMissingActionHook: {
+		name: "CORE_MODULES_MISSING_ACTION_HOOK",
+		content: "hook for module/action {module}/{action} doesn't exit"
 	}
+
 } as const satisfies CoreMessagesShape
