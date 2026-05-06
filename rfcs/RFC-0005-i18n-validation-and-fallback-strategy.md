@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (Post v0.1)
+Implemented ✅
 
 ---
 
@@ -13,6 +13,9 @@ This RFC depends on:
 * RFC-0002-builtins-customs-merge-removal
 
 Builtins and custom i18n systems MUST be separated before applying this RFC.
+
+* *We eventually have to deploy this rfc before builtins and customs are separated completely in the core*
+  * so, we'll check and search if we really need it or not
 
 ---
 

@@ -1,6 +1,6 @@
 import { Context } from "@contexts";
-import { FinalTranslations } from "@data";
-import { CoreEventsShape, CoreGlobalsShape, CoreMessage, CoreModulesShape, CoreStagesShape, CoreTranslationsDecl, CoreTranslationsShape, RuntimeI18nFacts } from "@types";
+import { BUILTIN_MESSAGES, FinalTranslations } from "@data";
+import { CoreEventKind, CoreEventsShape, CoreGlobalsShape, CoreMessage, CoreModulesShape, CoreStagesShape, CoreTranslationsDecl, CoreTranslationsShape, RuntimeI18nFacts } from "@types";
 
 /**
  * TODO: V0.1: Polish the entire class: remove the builtins hook methods for old builtin stages and their caller method
@@ -73,7 +73,8 @@ export class I18nManager<
 		this._dict = {
 			translations,
 			index: {
-				byCode: {},
+				byKey: {},
+				byName: {},
 				byLang: {}
 			}
 		};
@@ -138,8 +139,9 @@ export class I18nManager<
 	private async _resolveIndexes() {
 		const dict = this.getDict().translations;
 
+		const byKey: Record<string, Record<string, CoreMessage<string>>> = {};
 		const byLang: Record<string, Record<string, CoreMessage<string>>> = {};
-		const byCode: Record<string, Record<string, CoreMessage<string>>> = {};
+		const byName: Record<string, Record<string, CoreMessage<string>>> = {};
 
 		for (const lang of Object.keys(dict)) {
 			const langDict = dict[lang];
@@ -150,21 +152,27 @@ export class I18nManager<
 			for (const key of Object.keys(langDict)) {
 				const msg = langDict[key];
 				if (!msg) continue;
-				const code = msg.code;
+				const name = msg.name;
 
 				// byLang
-				byLang[lang][code] = msg;
+				byLang[lang][name] = msg;
 
-				// byCode
-				if (!byCode[code]) {
-					byCode[code] = {};
+				// byName
+				if (!byName[name]) {
+					byName[name] = {};
 				}
 
-				byCode[code][lang] = msg;
+				byName[name][lang] = msg;
+				// byKey
+				if (!byKey[key]) {
+					byKey[key] = {};
+				}
+
+				byKey[key][lang] = msg;
 			}
 		}
 
-		this.getDict().index = { byLang, byCode };
+		this.getDict().index = { byKey, byLang, byName };
 	}
 
 	/**
@@ -190,55 +198,128 @@ export class I18nManager<
 	 */
 	public async resolve(): Promise<void> {
 
-
 		const fallback = "en";
+
 		const stage = this._ctx.stages.getResolved();
 
 		const lang = stage.options.lang as string ?? fallback;
 
 		const dict = this.getDict().index.byLang;
 
+		/**
+		 * Builtin english dictionary is mandatory.
+		 */
 		const en = dict[fallback];
+
 		if (!en) {
-			this._ctx.events.throw("i18nMissingLang", { details: ["'en' builtins mandatory"] });
+			this._ctx.events.throw("i18nMissingLang", {
+				details: ["'en' builtins mandatory"]
+			});
 		}
 
-		for (const langDict of Object.keys(dict)) {
-			if (langDict === fallback) continue;
+		/**
+		 * Resolve builtin runtime message names from event registry.
+		 *
+		 * Rules:
+		 * - only builtin CORE_* message events are considered
+		 * - english translations are the mandatory reference layer
+		 */
+		const builtinNames = Object
+			.values(this._ctx.events.getEvents())
+			.filter(
+				(event) =>
+					event.kind === CoreEventKind.message &&
+					event.name.startsWith("CORE_")
+			)
+			.map((event) => event.name);
 
-			const current = dict[langDict]!;
+		/**
+		 * Validate english builtin completeness.
+		 *
+		 * Every builtin message event MUST exist in english.
+		 */
+		const missingBuiltinEn = builtinNames.filter(
+			(name) => !(name in en)
+		);
 
-			const missing = Object.keys(en).filter(k => !(k in current));
-			if (missing.length) {
-				await this._ctx.events.warn("i18nMissingKeys", {
-					details: [`lang:${langDict}`, `missing:${missing.length}`, ...missing]
-				});
-			}
-			const unknown: string[] = Object.keys(current).filter(
-				(k) => !(k in en)
+		if (missingBuiltinEn.length > 0) {
+			this._ctx.events.throw("i18nMissingBuiltinMessage", {
+				details: missingBuiltinEn
+			});
+		}
+
+		/**
+		 * Validate non-reference languages.
+		 */
+		for (const currentLang of Object.keys(dict)) {
+
+			if (!(currentLang in BUILTIN_MESSAGES)) continue;
+
+			if (currentLang === fallback) continue;
+
+			const current = dict[currentLang];
+
+			if (!current) continue;
+
+			/**
+			 * Missing builtin messages in non-reference languages.
+			 *
+			 * Allowed:
+			 * - runtime fallback to "en" will handle resolution
+			 */
+			const missing = builtinNames.filter(
+				(name) => !(name in current)
 			);
-			if (unknown.length) {
+
+			if (missing.length > 0) {
+				await this._ctx.events.warn("i18nMissingKeys", {
+					details: [
+						`lang:${currentLang}`,
+						`missing:${missing.length}`,
+						...missing
+					]
+				});
+			}
+
+			/**
+			 * Detect unknown builtin names.
+			 *
+			 * If a language declares a CORE_* message that does not exist
+			 * in english builtins, resolution MUST stop.
+			 */
+			const unknownNames: string[] = Object.keys(current).filter(
+				(name) =>
+					name.startsWith("CORE_") &&
+					!(name in en)
+			);
+
+			if (unknownNames.length > 0) {
 				this._ctx.events.throw("i18nUnknownKeys", {
-					details: [`lang:${langDict}`, `count:${unknown.length}`, ...unknown]
+					details: [
+						`lang:${currentLang}`,
+						`count:${unknownNames.length}`,
+						...unknownNames
+					]
 				});
 			}
 		}
 
-		const index = dict[lang] ?? {};
-		const fallbackIndex = dict[fallback]!;
-
-		const resolved: RuntimeI18nFacts = {
-			lang,
-			fallback,
-			index,
-			fallbackIndex
-
-		}
-
+		/**
+		 * Freeze dictionaries after validation.
+		 */
 		this._freezeDict();
+
+		/**
+		 * Runtime facts are intentionally minimal.
+		 *
+		 * Translation indexes remain internal to I18nManager.
+		 */
+		const resolved: RuntimeI18nFacts = {
+			lang
+		};
+
 		this._setResolved(resolved);
 	}
-
 	/**
 	 * Inject dynamic placeholder values into a translated string.
 	 *
@@ -263,21 +344,18 @@ export class I18nManager<
 		text: string,
 		values?: Record<string, string>
 	): string {
+
 		if (!values) return text;
 
-		return text.replace(/\{(.*?)\}/g, (_match: string, key: string) => {
-			if (values && key in values) {
+		return text.replace(/\{(.*?)\}/g, (_match, key) => {
+
+			if (key in values) {
 				return values[key]!;
 			}
-
-			this._ctx.events.warn("i18nMissingMessageValues", {
-				details: [key]
-			});
 
 			return `{${key}}`;
 		});
 	}
-
 	/**
 	 * Translate a message code into a runtime message object.
 	 *
@@ -303,53 +381,106 @@ export class I18nManager<
 	 * Guard behavior:
 	 * - If called before resolution, `getResolved()` emits `i18nMissingResolved`
 	 *
-	 * @param code - Canonical translation code
+	 * @param name - Canonical translation name
 	 * @param values - Optional placeholder values
 	 * @returns Resolved CoreMessage
 	 */
 	public async tr(
-		code: string,
+		name: string,
 		values?: Record<string, string>
 	): Promise<CoreMessage<string>> {
 
-		const { index, fallbackIndex } = this.getResolved();
+		const lang = this.getResolved().lang;
 
-		let msg = index[code];
+		const indexes = this.getDict().index;
 
-		// fallback
-		if (!msg) {
-			msg = fallbackIndex[code];
+		const byName = indexes.byName;
 
-			if (msg) {
-				await this._ctx.events.warn("i18nFallbackUsed", {
-					details: [code]
+		const isBuiltin = name.startsWith("CORE_");
+
+		/**
+		 * Resolve message bucket by canonical runtime name.
+		 */
+		const bucket = byName[name];
+
+		/**
+		 * Builtin messages:
+		 * - fallback to "en"
+		 * - strict runtime guarantees
+		 */
+		if (isBuiltin) {
+
+			const msg =
+				bucket?.[lang] ??
+				bucket?.["en"];
+
+			/**
+			 * Builtin fallback used. No warning for builtins eventually , commenting this part
+			 */
+			// if (!bucket?.[lang] && bucket?.["en"]) {
+			// 	await this._ctx.events.warn("i18nFallbackUsed", {
+			// 		details: [name]
+			// 	});
+			// }
+
+			/**
+			 * Impossible runtime state.
+			 *
+			 * Builtins are validated during resolve().
+			 */
+			if (!msg) {
+				this._ctx.events.throw("i18nMissingBuiltinMessage", {
+					details: [name]
 				});
 			}
+
+			// normal message
+			if ("content" in msg) {
+				return {
+					name,
+					content: this._inject(msg.content, values)
+				};
+			}
+
+			// full message
+			return {
+				name,
+				title: this._inject(msg.title, values),
+				description: this._inject(msg.description, values)
+			};
 		}
 
-		// missing message
+		/**
+		 * Custom messages:
+		 * - no language fallback
+		 * - fallback directly to runtime name
+		 */
+		const msg = bucket?.[lang];
 		if (!msg) {
-			await this._ctx.events.warn("i18nMissingMessage", {
-				details: [code]
-			});
+
+			if (!this._ctx.settings.skipI18nWarnings) {
+				await this._ctx.events.warn("i18nFallbackUsed", {
+					details: [name]
+				});
+			}
 
 			return {
-				code,
-				content: `${code}`
+				name,
+				content: name
 			};
 		}
 
 		// normal message
 		if ("content" in msg) {
 			return {
-				code,
+				name,
 				content: this._inject(msg.content, values)
 			};
 		}
 
 		// full message
 		return {
-			code,
+			name,
 			title: this._inject(msg.title, values),
 			description: this._inject(msg.description, values)
 		};

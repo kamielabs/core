@@ -36,6 +36,7 @@ export type CLISettings = {
 	coreConsoleLevel?: keyof typeof CoreEventLevelLabel;
 	defaultStageName?: string;
 	engine?: CoreEngineName;
+	skipI18nWarnings?: boolean;
 }
 
 export type CLIOptions<

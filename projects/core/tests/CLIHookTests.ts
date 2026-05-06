@@ -21,14 +21,14 @@ export function configureCLI() {
 	// })
 	//
 	// cli.hooks().onGlobals(({ options, tools }) => {
-
-	// tools.addListener(
-	// 	(event) => console.log("CUSTOM ONLY:", event.code),
-	// 	"default",
-	// 	"*"
-	// )
-	// console.log(options.customGlobalGroup1)
-
+	//
+	// 	tools.addListener(
+	// 		(event) => console.log("CUSTOM ONLY:", event.name),
+	// 		"default",
+	// 		"*"
+	// 	)
+	// 	console.log(options.customGlobalGroup1)
+	//
 	// })
 
 	// cli.hooks().onModule('test2', ({ options }) => {
@@ -44,13 +44,13 @@ export function addModules() {
 	// 	console.log(runtime.module);
 	// })
 
-	cli.hooks().onModuleAction('test', '__defaultAction__', async ({ options, runtime }) => {
+	cli.hooks().onModuleAction('test', '__defaultAction__', async ({ tools }) => {
 
-		//tools.message.throw('testEventCustom1');
 		console.log("Hooking ! action test.__defaultAction__ OK !");
-		console.log(runtime.globals)
-		console.log(runtime.module)
-		console.log(options)
+		await tools.message.info('testEventCustom1');
+		// console.log(runtime.globals)
+		// console.log(runtime.module)
+		// console.log(options)
 	});
 	cli.hooks().onModuleAction('test2', 'testAction', ({ runtime, snapshot, options }) => {
 		if (snapshot) {

@@ -4,6 +4,7 @@ import { addModules, configureCLI, setStageBuiltinDefaults } from "./CLIHookTest
 
 export const cli = CLI.init({
 	settings: {
+		skipI18nWarnings: false,
 		coreConsoleLevel: 'trace',
 		defaultStageName: "dev",
 		engine: "fed"
@@ -13,7 +14,7 @@ export const cli = CLI.init({
 			name: "TEST_EVENT_CUSTOM1",
 			phase: CoreEventPhase.runtime,
 			kind: CoreEventKind.message,
-			level: CoreEventLevel.fatal
+			level: CoreEventLevel.info
 		},
 		testEventCustom2: {
 			name: "TEST_EVENT_CUSTOM2",
@@ -60,17 +61,15 @@ export const cli = CLI.init({
 		}
 
 	},
-	// translations: {
-	// 	es: {
-	// 		stageInit: {
-	// 			code: 'CORE_EVENT_ACTION_INIT',
-	// 			title: 'Maque !',
-	// 			description: 'Quesadillas ! ! ! '
-	// 		}
-	// 	}
-	// },
-	// La il faut clairement refaire des helpers,
-	// le dev ne doit avoir à déclarer defaultAction et son nom core implicite '__defaultAction__'
+	translations: {
+		es: {
+			testEventCustom1: {
+				name: 'TEST_EVENT_CUSTOM4',
+				title: 'Maque !',
+				description: 'Quesadillas ! ! ! '
+			}
+		}
+	},
 	modules: {
 		// 	__defaultModule__: {
 		// 		singleAction: {

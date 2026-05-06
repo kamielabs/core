@@ -48,6 +48,12 @@ export const BUILTIN_I18N_EVENTS = {
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.i18n
 	},
+	i18nMissingBuiltinMessage: {
+		name: 'CORE_I18N_MISSING_BUILTIN_MESSAGE',
+		level: CoreEventLevel.fatal,
+		kind: CoreEventKind.signal,
+		phase: CoreEventPhase.i18n
+	},
 	i18nUnknownKeys: {
 		name: 'CORE_I18N_UNKNOWN_KEYS',
 		level: CoreEventLevel.fatal,
@@ -57,12 +63,6 @@ export const BUILTIN_I18N_EVENTS = {
 	// I18n warnings, issued but not blocking core to run
 	i18nMissingKeys: {
 		name: 'CORE_I18N_MISSING_KEYS',
-		level: CoreEventLevel.warning,
-		kind: CoreEventKind.signal,
-		phase: CoreEventPhase.i18n
-	},
-	i18nMissingMessage: {
-		name: 'CORE_I18N_MISSING_MESSAGE',
 		level: CoreEventLevel.warning,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.i18n
