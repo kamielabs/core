@@ -1,3 +1,5 @@
+import { FinalEvents } from "@data";
+
 /**
  * Declarative event kind.
  *
@@ -123,10 +125,20 @@ export type CoreEvent<
  * `event.name` remains the canonical runtime identifier.
  */
 export type CoreEventsShape = {
-	[Name: string]: CoreEvent<
+	[Key: string]: CoreEvent<
 		string
 	>;
 };
+
+export type CoreEventsShapeDecl<TEvents extends CoreEventsShape> = {
+	list: FinalEvents<TEvents>;
+	indexes: {
+		byName: Record<string, string>,
+		byKind: Record<CoreEventKind, string[]>,
+		byPhase: Record<CoreEventPhase, string[]>,
+		byLevel: Record<CoreEventLevel, string[]>
+	}
+}
 
 /* -------------------------------------------------------------------------- */
 /* Runtime events                                                             */

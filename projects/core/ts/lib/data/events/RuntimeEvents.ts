@@ -16,32 +16,32 @@ import {
 export const BUILTIN_RUNTIME_EVENTS = {
 	// INIT/DICTS FATAL ERRORS
 	runtimeMissingDraft: {
-		name: 'CORE_RUNTIME_MISSING_DRAFT',
+		name: 'core.runtime.missing.draft',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.runtime
 	},
 	runtimeAlreadyResolved: {
-		name: 'CORE_RUNTIME_ALREADY_RESOLVED',
+		name: 'core.runtime.already.resolved',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.runtime
 	},
 	runtimeMissingResolved: {
-		name: 'CORE_RUNTIME_MISSING_RESOLVED',
+		name: 'core.runtime.missing.resolved',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.runtime
 	},
 	// Runtime Transition Fatal (have to be signals)
 	runtimeInvalidTransition: {
-		name: 'CORE_RUNTIME_INVALID_TRANSITION',
+		name: 'core.runtime.invalid.transition',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.runtime
 	},
 	runtimeMissingEvent: {
-		name: 'CORE_RUNTIME_MISSING_EVENT',
+		name: 'core.runtime.missing.event',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.runtime,
@@ -50,14 +50,20 @@ export const BUILTIN_RUNTIME_EVENTS = {
 
 	// FLOW messages
 	runtimeInit: {
-		name: 'CORE_RUNTIME_INIT',
+		name: 'core.runtime.init',
 		level: CoreEventLevel.trace,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.runtime,
 		trigger: true
 	},
+	runtimeErrorModuleHelp: {
+		name: 'core.runtime.error.module.help',
+		level: CoreEventLevel.error,
+		kind: CoreEventKind.message,
+		phase: CoreEventPhase.runtime,
+	},
 	runtimeReady: {
-		name: 'CORE_RUNTIME_READY',
+		name: 'core.runtime.ready',
 		level: CoreEventLevel.trace,
 		kind: CoreEventKind.message,
 		phase: CoreEventPhase.runtime,

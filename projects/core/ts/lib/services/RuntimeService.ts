@@ -268,9 +268,9 @@ export class RuntimeService<
 			this._ctx.settings.defaultStageName
 		);
 
-			await this._ctx.events.emit("stageReady", {
-				values: { stage: `${displayStageName}` }
-			});
+		await this._ctx.events.emit("stageReady", {
+			values: { stage: `${displayStageName}` }
+		});
 	}
 
 	/**
@@ -357,6 +357,7 @@ export class RuntimeService<
 	public async setReady() {
 		this._ctx.parser.finalize();
 		await this._ctx.events.emit('parserReady');
+		this.getDraft().parser = this._ctx.parser.getResolved();
 		this._setState(RuntimeStateEnum.ready);
 		this._setResolved(this._ctx.helpers.core.deepClone(this.getDraft()));
 		this._clearDraft();

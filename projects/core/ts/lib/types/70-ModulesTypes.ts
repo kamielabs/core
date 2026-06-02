@@ -22,7 +22,7 @@ type ActionWithoutAliases = { aliases?: never };
 
 export type ActionBase = {
 	description?: string;
-	signature?: string[]; // "default help display like "<value> [index]"
+	argsHint?: string[]; // "default help display like "<value> [index]"
 }
 
 export type SingleAction = ActionBase

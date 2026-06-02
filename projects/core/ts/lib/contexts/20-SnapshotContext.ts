@@ -8,19 +8,18 @@
 // - Any structural change in final data composition must be reflected here
 
 import {
-	FinalEvents,
-	FinalGlobals,
-	FinalModules,
-	FinalStages,
-	FinalTranslations
-} from "@data";
-import {
+	CoreMetaShape,
 	CLISettings,
 	CoreEventsShape,
 	CoreGlobalsShape,
 	CoreModulesShape,
 	CoreStagesShape,
-	CoreTranslationsShape
+	CoreTranslationsShape,
+	CoreModulesShapeDecl,
+	CoreGlobalsDecl,
+	CoreTranslationsDecl,
+	CoreStagesShapeDecl,
+	CoreEventsShapeDecl
 } from "@types";
 
 /**
@@ -54,6 +53,10 @@ export type SnapshotFullContext<
 	TTranslations extends CoreTranslationsShape
 > = {
 	/**
+	 * Final Meta Informations
+	 */
+	meta: CoreMetaShape;
+	/**
 	 * Final CLI settings.
 	 */
 	settings: CLISettings
@@ -61,25 +64,25 @@ export type SnapshotFullContext<
 	/**
 	 * Final merged events dictionary.
 	 */
-	events: FinalEvents<TEvents>;
+	events: CoreEventsShapeDecl<TEvents>;
 
 	/**
 	 * Final merged stages dictionary.
 	 */
-	stages: FinalStages<TStages>;
+	stages: CoreStagesShapeDecl<TStages>;
 
 	/**
 	 * Final merged translations dictionary.
 	 */
-	i18n: FinalTranslations<TTranslations>;
+	i18n: CoreTranslationsDecl<TTranslations>;
 
 	/**
 	 * Final merged globals dictionary.
 	 */
-	globals: FinalGlobals<TGlobals>;
+	globals: CoreGlobalsDecl<TGlobals>;
 
 	/**
 	 * Final merged modules dictionary.
 	 */
-	modules: FinalModules<TModules>;
+	modules: CoreModulesShapeDecl<TModules>;
 }

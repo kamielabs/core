@@ -9,6 +9,12 @@ import { CoreErrorsShape } from "@types";
 // - Once EventsManager is available, prefer event-based error handling
 // - panic() will terminate the process immediately
 
+export class SilentPanicError extends Error {
+	constructor() {
+		super();
+	}
+}
+
 /**
  * CoreError
  *
@@ -154,19 +160,22 @@ export class CoreError extends Error {
 
 		if (!error) {
 			console.error(`[CORE: UNKNOWN] Unknown CoreError key: ${String(key)}`);
-			process.exit(1);
+			process.stderr.write("");
+			// return process.stderr.write("") as never;
+		} else {
+
+			const message = desc ?? error.name;
+
+			console.error(
+				`[CORE: ${error.code}] ${error.name}\n`,
+				`Source: ${error.source}\n`,
+				`Error: ${message}`
+			);
+
+			// return process.stderr.write("") as never;
+			process.stderr.write("");
+
 		}
-
-		const message = desc ?? error.name;
-
-		console.error(
-			`[CORE: ${error.code}] ${error.name}\n`,
-			`Source: ${error.source}\n`,
-			`Error: ${message}`
-		);
-
-		process.stderr.write("");
-
 		process.exit(1);
 	}
 

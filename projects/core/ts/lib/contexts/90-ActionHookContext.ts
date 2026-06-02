@@ -15,10 +15,12 @@ import {
 	CoreStagesShape,
 	CoreTranslationsShape,
 	ParsedOptionValue,
+	RuntimeCoreEvent,
 	RuntimeFullFacts
 } from "@types";
 
 import {
+	GetFilteredEventsMethod,
 	MessageDebugHookMethod,
 	MessageInfoHookMethod,
 	MessageThrowHookMethod,
@@ -117,6 +119,11 @@ export type ToolsActionContext<
 		warn: MessageWarnHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
 		throw: MessageThrowHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
 	};
+	getEvents: GetFilteredEventsMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+}
+
+export type LiveActionContext = {
+	events: RuntimeCoreEvent<string>[]
 }
 
 /**
@@ -150,6 +157,7 @@ export type ActionHook<
 	 */
 	options: TOptions;
 
+	args: string[];
 	/**
 	 * Controlled tools for side-effects.
 	 */
@@ -164,6 +172,8 @@ export type ActionHook<
 	 * Full system snapshot.
 	 */
 	snapshot: SnapshotFullContext<TEvents, TStages, TGlobals, TModules, TTranslations>;
+
+	live: LiveActionContext;
 }) => void | Promise<void>;
 
 /**

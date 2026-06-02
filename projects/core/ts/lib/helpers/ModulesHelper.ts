@@ -10,21 +10,28 @@
 
 // TODO: ARCHITECTURE — Integrate into ctx.helpers.* (context-bound helpers)
 
+import { Context } from "@contexts";
 import { FinalModules } from "@data";
 import {
 	ActionFlagIndexEntries,
 	ActionIndex,
+	CoreEventsShape,
+	CoreGlobalsShape,
 	CoreModulesShape,
+	CoreStagesShape,
+	CoreTranslationsShape,
 	FlagIndex,
 	IndexedFlag,
 	ModuleFlagIndexEntries,
-	ModuleIndex
+	ModuleIndex,
+	RuntimeCoreEvent,
+	UsageRoute
 } from "@types";
 
 /**
  * ModulesHelpers
  *
- * Static helper class for:
+ * helper class for:
  * - module/action resolution
  * - alias handling
  * - parser flag index construction
@@ -33,31 +40,74 @@ import {
  * - Pure functions (no side-effects)
  * - Operates on precomputed indexes
  */
-export class ModulesHelpers {
+export class ModulesHelpers<
+	TEvents extends CoreEventsShape,
+	TStages extends CoreStagesShape,
+	TGlobals extends CoreGlobalsShape,
+	TModules extends CoreModulesShape,
+	TTranslations extends CoreTranslationsShape
+> {
 
-	constructor() { };
+	private readonly _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+
+	constructor(ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>) {
+		this._ctx = ctx;
+	};
 
 	/**
 	 * Type guard: checks if object has "options"
 	 */
-	public static hasOptions(obj: unknown): obj is { options: Record<string, any> } {
+	public hasOptions(obj: unknown): obj is { options: Record<string, any> } {
 		return typeof obj === 'object' && obj !== null && "options" in obj;
 	}
 
 	/**
 	 * Type guard: checks if object has "actions"
 	 */
-	public static hasActions(obj: unknown): obj is { actions: Record<string, any> } {
+	public hasActions(obj: unknown): obj is { actions: Record<string, any> } {
 		return typeof obj === 'object' && obj !== null && "actions" in obj;
 	}
 
 	/**
 	 * Type guard: checks if object has "defaultAction"
 	 */
-	public static hasDefaultAction(obj: unknown): obj is { defaultAction: Record<string, any> } {
+	public hasDefaultAction(obj: unknown): obj is { defaultAction: Record<string, any> } {
 		return typeof obj === 'object' && obj !== null && "defaultAction" in obj;
 	}
+	public resolveUsageRoute(
+		events: RuntimeCoreEvent<string>[],
+	): UsageRoute {
+		if (events.length !== 1) {
+			return "fullUsage";
+		}
 
+		const event = events[0]!;
+		switch (event.name) {
+			case 'CORE_PARSER_UNKNOWN_MODULE':
+				return "fullUsage";
+			case 'CORE_PARSER_MISSING_MODULE':
+				return "fullUsage";
+			case 'CORE_PARSER_UNKNOWN_ACTION':
+				return "moduleUsage";
+			case 'CORE_PARSER_MISSING_ACTION':
+				return "moduleUsage";
+			case 'CORE_PARSER_UNKNOWN_GLOBAL_FLAG':
+				return "fullUsage";
+			case 'CORE_PARSER_UNKNOWN_MODULE_FLAG':
+				return "moduleUsage";
+			case 'CORE_PARSER_UNKNOWN_ACTION_FLAG':
+				return "actionUsage";
+			case 'CORE_PARSER_DUPLICATE_FLAG':
+				return "flagUsage";
+			case 'CORE_PARSER_MISSING_FLAG_VALUE':
+				return "flagUsage";
+			case 'CORE_PARSER_UNEXPECTED_FLAG_VALUE':
+				return "flagUsage";
+			case 'CORE_PARSER_INVALID_SHORT_GROUP':
+				return "flagUsage";
+			default: return "fullUsage";
+		}
+	}
 	/**
 	 * buildParserFlagIndexFromModule
 	 *
@@ -80,7 +130,7 @@ export class ModulesHelpers {
 	 *
 	 * @returns FlagIndex
 	 */
-	public static buildParserFlagIndexFromModule<
+	public buildParserFlagIndexFromModule<
 		TModules extends CoreModulesShape
 	>(
 		modules: FinalModules<TModules>,
@@ -141,7 +191,7 @@ export class ModulesHelpers {
 	 *
 	 * @returns FlagIndex
 	 */
-	public static buildParserFlagIndexFromAction<
+	public buildParserFlagIndexFromAction<
 		TModules extends CoreModulesShape
 	>(
 		modules: FinalModules<TModules>,
@@ -205,7 +255,7 @@ export class ModulesHelpers {
 	 * Format:
 	 * - "module.action"
 	 */
-	public static actionKey(module: string, action: string): string {
+	public actionKey(module: string, action: string): string {
 		return `${module}.${action}`;
 	}
 
@@ -216,7 +266,7 @@ export class ModulesHelpers {
 	 * - direct name
 	 * - alias
 	 */
-	public static moduleExists(index: ModuleIndex, name: string): boolean {
+	public moduleExists(index: ModuleIndex, name: string): boolean {
 
 		if (index.byName[name]) return true;
 
@@ -235,7 +285,7 @@ export class ModulesHelpers {
 	 * Fallback:
 	 * - returns input if not found
 	 */
-	public static resolveModuleName(index: ModuleIndex, name: string): string {
+	public resolveModuleName(index: ModuleIndex, name: string): string {
 
 		if (index.byName[name]) return name;
 
@@ -253,7 +303,7 @@ export class ModulesHelpers {
 	 * - by name
 	 * - by alias
 	 */
-	public static actionExists(
+	public actionExists(
 		index: ActionIndex,
 		module: string,
 		action: string
@@ -280,7 +330,7 @@ export class ModulesHelpers {
 	 * Fallback:
 	 * - returns input if not found
 	 */
-	public static resolveActionName(
+	public resolveActionName(
 		index: ActionIndex,
 		module: string,
 		action: string

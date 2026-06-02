@@ -1,14 +1,15 @@
-import { CoreEngineName } from "@data";
+import { CoreEngineName, FinalGlobals, FinalModules, FinalStages, FinalTranslations } from "@data";
 import {
 	CoreEventsShape,
 	CoreStagesShape,
 	CoreGlobalsShape,
 	ParsedOptionValue,
-	ParserIssue,
 	RuntimeGlobalsFacts,
 	CoreModulesShape,
 	CoreTranslationsShape,
-	CoreEventLevelLabel
+	CoreEventLevelLabel,
+	CoreMetaShape,
+	CoreEventsShapeDecl
 } from "@types";
 
 /**
@@ -29,14 +30,36 @@ export interface RuntimeCliContext {
 export interface ParsedCliContextResult {
 	context: RuntimeCliContext;
 	ignored: string[];
-	issues: ParserIssue[];
+}
+
+export type CoreConsoleSettings = {
+	level?: keyof typeof CoreEventLevelLabel;
+	showTS?: boolean;
+	showLevel?: boolean;
+	showPhase?: boolean;
 }
 
 export type CLISettings = {
-	coreConsoleLevel?: keyof typeof CoreEventLevelLabel;
+	console?: CoreConsoleSettings;
 	defaultStageName?: string;
 	engine?: CoreEngineName;
 	skipI18nWarnings?: boolean;
+}
+
+export type CLIUserSettings<
+	TCustomEvents extends CoreEventsShape,
+	TCustomStages extends CoreStagesShape,
+	TCustomGlobals extends CoreGlobalsShape,
+	TCustomModules extends CoreModulesShape,
+	TCustomTranslations extends CoreTranslationsShape
+> = {
+	meta?: Partial<CoreMetaShape["cli"]> | undefined;
+	settings?: CLISettings | undefined;
+	events: CoreEventsShapeDecl<TCustomEvents>,
+	stages: FinalStages<TCustomStages>,
+	translations: FinalTranslations<TCustomTranslations>,
+	globals: FinalGlobals<TCustomGlobals>,
+	modules: FinalModules<TCustomModules>,
 }
 
 export type CLIOptions<
@@ -46,6 +69,7 @@ export type CLIOptions<
 	TCustomModules extends CoreModulesShape = {},
 	TCustomTranslations extends CoreTranslationsShape = {}
 > = {
+	meta?: Partial<CoreMetaShape["cli"]> | undefined;
 	settings?: CLISettings;
 	events?: TCustomEvents;
 	stages?: TCustomStages;

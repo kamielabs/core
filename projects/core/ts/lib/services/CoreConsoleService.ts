@@ -9,7 +9,9 @@ import {
 	CoreModulesShape,
 	CoreStagesShape,
 	CoreTranslationsShape,
-	RuntimeCoreEvent
+	RuntimeCoreEvent,
+	CoreConsoleSettings,
+	CoreEventLevelLabel
 } from "@types";
 
 /**
@@ -86,6 +88,7 @@ export class CoreConsoleService<
 	 * Minimum event level required for display.
 	 */
 	private _displayLevel: CoreEventLevel;
+	private _settings: CoreConsoleSettings;
 
 	/**
 	 * Constructor.
@@ -98,7 +101,9 @@ export class CoreConsoleService<
 		this._ctx = ctx;
 		// this.print = this.print.bind(this);
 		this._ctx.events.registerSystemListener("*", { handler: this.print, channel: "default" });
-		this._displayLevel = CoreEventLevel[this._ctx.settings.coreConsoleLevel!];
+
+		this._settings = this._ctx.settings.console!;
+		this._displayLevel = CoreEventLevelLabel[this._settings.level!]
 	}
 
 	public init: () => Promise<void> = async (): Promise<void> => { };
@@ -124,12 +129,13 @@ export class CoreConsoleService<
 	 * [time] LEVEL PHASE (optional name)
 	 */
 	private _formatBase(event: RuntimeCoreEvent<string>, withName?: boolean): string {
-		const time = this._formatTimestamp(event.ts);
-		const level = this._pad(CoreEventLevel[event.level].toUpperCase(), 7);
-		const phase = this._pad(CoreEventPhase[event.phase].toUpperCase(), 10);
+		const time = this._settings.showTS ? `[${this._formatTimestamp(event.ts)}] ` : "";
+		const level = this._settings.showLevel ? `${this._pad(CoreEventLevel[event.level].toUpperCase(), 7)} ` : "";
+		const phase = this._settings.showPhase ? `${this._pad(CoreEventPhase[event.phase].toUpperCase(), 10)} ` : "";
 
-		if (withName && withName === true) return `[${time}] ${level} ${phase} ${event.name}`;
-		return `[${time}] ${level} ${phase}`
+
+		if (withName && withName === true) return `${time}${level}${phase}${event.name}`;
+		return `${time}${level}${phase}`
 	}
 
 	/**
@@ -169,11 +175,18 @@ export class CoreConsoleService<
 		const base = this._formatBase(event, false);
 
 		if ("content" in msg) {
-			return `${base} ${msg.content}`;
+			const content = base === "" ? `${msg.content}` : `${base}${msg.content}`;
+			return content;
 		}
 
-		if (msg.description && msg.description.trim() !== "") return `${base} ${msg.title}\n→ ${msg.description}`;
-		return `${base} ${msg.title}`
+		let fullMessage = base === "" ? `${base} ` : "";
+		fullMessage += msg.title;
+		if (msg.description && msg.description.trim() !== "") {
+			fullMessage += `\n→ ${msg.description}`;
+			return fullMessage
+		}
+
+		return fullMessage;
 	}
 
 	/**

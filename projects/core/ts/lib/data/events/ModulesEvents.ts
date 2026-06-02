@@ -16,58 +16,70 @@ import {
 export const BUILTIN_MODULES_EVENTS = {
 	// INIT/DICTS FATAL ERRORS
 	modulesMissingDraft: {
-		name: 'CORE_MODULES_MISSING_DRAFT',
+		name: 'core.modules.missing.draft',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.modules
 	},
 	modulesAlreadyResolved: {
-		name: 'CORE_MODULES_ALREADY_RESOLVED',
+		name: 'core.modules.already.resolved',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.modules,
 	},
 	modulesMissingResolved: {
-		name: 'CORE_MODULES_MISSING_RESOLVED',
+		name: 'core.modules.missing.resolved',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.modules,
 	},
 	// Globals Indexes Fatal & Error (have to be signals)
 	modulesConflictModule: {
-		name: 'CORE_MODULES_CONFLICT_MODULE',
+		name: 'core.modules.conflict.module',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.modules
 	},
 	modulesConflictAction: {
-		name: 'CORE_MODULES_CONFLICT_ACTION',
+		name: 'core.modules.conflict.action',
+		level: CoreEventLevel.fatal,
+		kind: CoreEventKind.signal,
+		phase: CoreEventPhase.modules
+	},
+	moduleDuplicateFlag: {
+		name: 'core.module.duplicate.flag',
+		level: CoreEventLevel.fatal,
+		kind: CoreEventKind.signal,
+		phase: CoreEventPhase.modules
+	},
+	actionDuplicateFlag: {
+		name: 'core.action.duplicate.flag',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.modules
 	},
 	// FLOW messages
 	modulesInit: {
-		name: 'CORE_MODULES_INIT',
+		name: 'core.modules.init',
 		level: CoreEventLevel.trace,
 		kind: CoreEventKind.message,
 		phase: CoreEventPhase.modules,
 	},
 	modulesHooking: {
-		name: 'CORE_MODULES_HOOKING',
+		name: 'core.modules.hooking',
 		level: CoreEventLevel.trace,
 		kind: CoreEventKind.message,
 		phase: CoreEventPhase.modules,
 	},
 	modulesReady: {
-		name: 'CORE_MODULES_READY',
+		name: 'core.modules.ready',
 		level: CoreEventLevel.trace,
 		kind: CoreEventKind.message,
 		phase: CoreEventPhase.modules,
 		trigger: true // Event Triggers are set up on runtime.init(for first flow event) and then ready phase
 	},
 	modulesMissingActionHook: {
-		name: 'CORE_MODULES_MISSING_ACTION_HOOK',
+		name: 'core.modules.missing.action.hook',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.message,
 		phase: CoreEventPhase.modules

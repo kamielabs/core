@@ -9,6 +9,7 @@ import {
 	CoreEventPhase,
 	CoreEventPhaseLabel,
 	CoreEventsShape,
+	CoreEventsShapeDecl,
 	CoreGlobalsShape,
 	CoreModulesShape,
 	CoreStagesShape,
@@ -83,7 +84,7 @@ export class EventsManager<
 > {
 
 	private readonly _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
-	private _events: FinalEvents<TEvents>;
+	private _events: CoreEventsShapeDecl<TEvents>;
 	private _live: LiveCoreEventsDict;
 
 	/**
@@ -109,7 +110,7 @@ export class EventsManager<
 	 */
 	constructor(
 		ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>,
-		events: FinalEvents<TEvents>
+		events: CoreEventsShapeDecl<TEvents>
 	) {
 		this._ctx = ctx;
 		this._events = events;
@@ -143,8 +144,11 @@ export class EventsManager<
 		this._events = this._ctx.helpers.core.deepFreeze(this._events);
 	}
 
-	public getEvents(): FinalEvents<TEvents> {
+	public getDict(): CoreEventsShapeDecl<TEvents> {
 		return this._events;
+	}
+	public getEvents(): FinalEvents<TEvents> {
+		return this._events.list;
 	}
 
 	public getLive(): Readonly<LiveCoreEventsDict> {
@@ -233,6 +237,70 @@ export class EventsManager<
 		return this.getLive().index.byLevel[level] ?? [];
 	}
 
+	private _intersectIds(current: string[] | null, next: string[]): string[] {
+		if (current === null) {
+			return [...next];
+		}
+
+		const nextSet = new Set(next);
+
+		return current.filter((id) => {
+			return nextSet.has(id);
+		});
+	}
+
+	public getFilteredEvents({
+		kind = null,
+		phase = null,
+		level = null,
+		nameContains = null
+	}: {
+		kind?: keyof typeof CoreEventKindLabel | null;
+		phase?: keyof typeof CoreEventPhaseLabel | null;
+		level?: keyof typeof CoreEventLevelLabel | null;
+		nameContains?: string | null;
+	} = {}): RuntimeCoreEvent<string>[] {
+
+		let ids: string[] | null = null;
+
+		const kindKey = kind ? CoreEventKindLabel[kind] : null;
+		const phaseKey = phase ? CoreEventPhaseLabel[phase] : null;
+		const levelKey = level ? CoreEventLevelLabel[level] : null;
+
+		// Filter by kind
+		if (kindKey !== null) {
+			ids = this._intersectIds(
+				ids,
+				this._getIdsByKind(kindKey)
+			);
+		}
+
+		if (phaseKey !== null) {
+			ids = this._intersectIds(
+				ids,
+				this._getIdsByPhase(phaseKey)
+			);
+		}
+
+		if (levelKey !== null) {
+			ids = this._intersectIds(
+				ids,
+				this._getIdsByLevel(levelKey)
+			);
+		}
+
+		let events = ids === null
+			? [...this.getLive().list]
+			: this._resolveIds(ids);
+
+		if (nameContains !== null) {
+			events = events.filter((event) => {
+				return event.name.includes(nameContains);
+			});
+		}
+
+		return events;
+	}
 	/**
 	 * Resolve a public selector to a concrete runtime event name.
 	 *
@@ -743,7 +811,7 @@ export class EventsManager<
 	private async _emit<K extends keyof FinalEvents<TEvents>>(
 		key: K,
 		options?: EmitOptionsForKey<FinalEvents<TEvents>, K>
-	): Promise<RuntimeCoreEvent<string> | undefined> {
+	): Promise<RuntimeCoreEvent<string> | undefined> | never {
 
 
 		const evt = this.getEvents()[key];
@@ -820,8 +888,7 @@ export class EventsManager<
 		key: K,
 		options?: EmitOptionsForKey<BuiltinEvents, K>
 	): never {
-		this._emit(key, options as EmitOptionsForKey<FinalEvents<TEvents>, K> | undefined);
-		throw new Error('This Error is never processed, its a TS guard');
+		return this._emit(key, options as EmitOptionsForKey<FinalEvents<TEvents>, K> | undefined) as never;
 	}
 
 	public signalThrow<
@@ -830,8 +897,7 @@ export class EventsManager<
 		key: K,
 		options?: EmitOptionsForEvent<TEvents[K]> | undefined
 	): never {
-		this._emit(key, options as EmitOptionsForEvent<TEvents[K]> | undefined)
-		throw new Error('This Error is never processed, its a TS guard');
+		return this._emit(key, options as EmitOptionsForEvent<TEvents[K]> | undefined) as never;
 	}
 	public messageThrow<
 		K extends TerminalMessageKeys<TEvents>
@@ -839,8 +905,7 @@ export class EventsManager<
 		key: K,
 		options?: EmitOptionsForEvent<TEvents[K]> | undefined
 	): never {
-		this._emit(key, options as EmitOptionsForEvent<TEvents[K]> | undefined)
-		throw new Error('This Error is never processed, its a TS guard');
+		return this._emit(key, options as EmitOptionsForEvent<TEvents[K]> | undefined) as never
 	}
 
 	/**

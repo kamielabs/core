@@ -16,57 +16,57 @@ import {
 export const BUILTIN_GLOBALS_EVENTS = {
 	// INIT/DICTS FATAL ERRORS
 	globalsMissingDraft: {
-		name: 'CORE_GLOBALS_MISSING_DRAFT',
+		name: 'core.globals.missing.draft',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.globals
 	},
 	globalsAlreadyResolved: {
-		name: 'CORE_GLOBALS_ALREADY_RESOLVED',
+		name: 'core.globals.already.resolved',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.globals,
 	},
 	globalsMissingResolved: {
-		name: 'CORE_GLOBALS_MISSING_RESOLVED',
+		name: 'core.globals.missing.resolved',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.globals,
 	},
 	// Globals Indexes Fatal & Error (have to be signals)
 	globalsDuplicateEnv: {
-		name: 'CORE_GLOBALS_DUPLICATE_ENV',
+		name: 'core.globals.duplicate.env',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.globals
 	},
 	globalsConflictEnv: {
-		name: 'CORE_GLOBALS_CONFLICT_ENV',
+		name: 'core.globals.conflict.env',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.globals
 	},
 	globalsDuplicateFlag: {
-		name: 'CORE_GLOBALS_DUPLICATE_FLAG',
+		name: 'core.globals.duplicate.flag',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.globals
 	},
 	// FLOW Signals
 	globalsInit: {
-		name: 'CORE_GLOBALS_INIT',
+		name: 'core.globals.init',
 		level: CoreEventLevel.trace,
 		kind: CoreEventKind.message,
 		phase: CoreEventPhase.globals,
 	},
 	globalsHooking: {
-		name: 'CORE_GLOBALS_HOOKING',
+		name: 'core.globals.hooking',
 		level: CoreEventLevel.trace,
 		kind: CoreEventKind.message,
 		phase: CoreEventPhase.globals,
 	},
 	globalsReady: {
-		name: 'CORE_GLOBALS_READY',
+		name: 'core.globals.ready',
 		level: CoreEventLevel.trace,
 		kind: CoreEventKind.message,
 		phase: CoreEventPhase.globals,

@@ -30,41 +30,44 @@ import {
 	FlagIndex,
 	IndexedFlag,
 	ParsedFlagMeta,
-	ParserIssue,
 	FlagsPhaseResult,
 	KeywordPhaseResult,
 	ArgsPhaseResult,
 	ParsedFlagToken,
 	FlagRuntimeKeyMode,
+	CoreEventsShape,
+	CoreStagesShape,
+	CoreGlobalsShape,
+	CoreModulesShape,
+	CoreTranslationsShape,
 } from "@types";
 import { ParsedOptionValue } from "@types";
+import { Context } from "@contexts";
 
-export class ParsingHelpers {
+export class ParserHelpers<
+	TEvents extends CoreEventsShape,
+	TStages extends CoreStagesShape,
+	TGlobals extends CoreGlobalsShape,
+	TModules extends CoreModulesShape,
+	TTranslations extends CoreTranslationsShape
+> {
 
-	constructor() { };
+	private readonly _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+
+	constructor(ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>) {
+		this._ctx = ctx;
+	};
 
 	/**
 	 * Safe typed hasOwnProperty
 	 */
-	public static hasOwn<
+	public hasOwn<
 		O extends object,
 		K extends PropertyKey
 	>(obj: O, key: K): key is Extract<K, keyof O> {
 		return Object.prototype.hasOwnProperty.call(obj, key);
 	};
 
-	/**
-	 * Builds a ParserIssue object
-	 * Used everywhere to accumulate parsing errors
-	 */
-	public static buildIssue(
-		code: ParserIssue["code"],
-		message: string,
-		token?: string
-	): ParserIssue {
-		if (token) return { code, message, token }
-		else return { code, message };
-	};
 
 	/**
 	 * Resolves the stored value for a flag
@@ -74,7 +77,7 @@ export class ParsingHelpers {
 	 * - value     → static value → return cli.value
 	 * - otherwise → undefined (flag ignored at runtime level)
 	 */
-	public static resolveFlagStoredValue(entry: IndexedFlag, userValue?: string): ParsedOptionValue | undefined {
+	public resolveFlagStoredValue(entry: IndexedFlag, userValue?: string): ParsedOptionValue | undefined {
 		const cli = entry.cliOption;
 
 		if ("valueHint" in cli && cli.valueHint !== undefined) {
@@ -101,37 +104,44 @@ export class ParsingHelpers {
 	 * 3. Validate value rules
 	 * 4. Return structured token
 	 */
-	public static parseLongFlagToken(token: string, index: FlagIndex): ParsedFlagToken {
+	public async parseLongFlagToken(token: string, index: FlagIndex): Promise<ParsedFlagToken> {
 		const eqIndex = token.indexOf("=");
 		const rawKey = eqIndex === -1 ? token : token.slice(0, eqIndex);
 		const value = eqIndex === -1 ? undefined : token.slice(eqIndex + 1);
 
 		const entry = index.byKey[rawKey];
 
+		const phase = this._ctx.parser.getPhase();
+		const scope = phase === 'globalFlags' ? 'globals' : phase === 'moduleFlags' ? 'module' : 'action';
+
 		if (!entry) {
+			switch (phase) {
+				case 'globalFlags':
+					await this._ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: rawKey } });
+					break;
+				case 'moduleFlags':
+					await this._ctx.events.warn('parserUnknownModuleFlag', { values: { flag: rawKey } });
+					break;
+				case 'actionFlags':
+					await this._ctx.events.warn('parserUnknownActionFlag', { values: { flag: rawKey } });
+					break;
+				default: break;
+			}
 			return {
 				kind: "unknown",
 				token,
-				issues: [
-					this.buildIssue("UNKNOWN_FLAG", `Unknown flag "${rawKey}" in current scope`, token)
-				]
 			};
 		}
 
 		const cli = entry.cliOption;
-		const issues: ParserIssue[] = [];
 
 		if ("valueHint" in cli && cli.valueHint !== undefined) {
 			if (value === undefined) {
-				issues.push(
-					this.buildIssue("MISSING_FLAG_VALUE", `Flag "${rawKey}" requires a value`, token)
-				);
+				await this._ctx.events.warn('parserMissingFlagValue', { values: { flag: rawKey, scope } });
 			}
 		} else if ("value" in cli) {
 			if (value !== undefined) {
-				issues.push(
-					this.buildIssue("UNEXPECTED_FLAG_VALUE", `Flag "${rawKey}" does not accept a user value`, token)
-				);
+				await this._ctx.events.warn('parserUnexpectedFlagValue', { values: { flag: rawKey, scope } });
 			}
 		}
 
@@ -140,16 +150,14 @@ export class ParsingHelpers {
 				kind: "single",
 				token,
 				entry,
-				value,
-				issues
+				value
 			}
 		}
 		else {
 			return {
 				kind: "single",
 				token,
-				entry,
-				issues
+				entry
 			}
 		}
 	}
@@ -167,16 +175,28 @@ export class ParsingHelpers {
 	 * - Only last flag can receive value
 	 * - valueHint flags must be last
 	 */
-	public static parseShortFlagToken(token: string, index: FlagIndex): ParsedFlagToken {
+	public async parseShortFlagToken(token: string, index: FlagIndex): Promise<ParsedFlagToken> {
 		const body = token.slice(1);
 
+		const phase = this._ctx.parser.getPhase();
+		const scope = phase === 'globalFlags' ? 'globals' : phase === 'moduleFlags' ? 'module' : 'action';
+
 		if (body.length === 0) {
+			switch (phase) {
+				case 'globalFlags':
+					await this._ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: token } });
+					break;
+				case 'moduleFlags':
+					await this._ctx.events.warn('parserUnknownModuleFlag', { values: { flag: token } });
+					break;
+				case 'actionFlags':
+					await this._ctx.events.warn('parserUnknownActionFlag', { values: { flag: token } });
+					break;
+				default: break;
+			}
 			return {
 				kind: "unknown",
-				token,
-				issues: [
-					this.buildIssue("UNKNOWN_FLAG", `Invalid short flag token "${token}"`, token)
-				]
+				token
 			};
 		}
 
@@ -186,33 +206,39 @@ export class ParsingHelpers {
 			const value = body.slice(2);
 			const entry = index.byKey[rawKey];
 
+
 			if (!entry) {
+				switch (phase) {
+					case 'globalFlags':
+						await this._ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: token } });
+						break;
+					case 'moduleFlags':
+						await this._ctx.events.warn('parserUnknownModuleFlag', { values: { flag: token } });
+						break;
+					case 'actionFlags':
+						await this._ctx.events.warn('parserUnknownActionFlag', { values: { flag: token } });
+						break;
+					default: break;
+				}
 				return {
 					kind: "unknown",
-					token,
-					issues: [
-						this.buildIssue("UNKNOWN_FLAG", `Unknown flag "${rawKey}" in current scope`, token)
-					]
+					token
 				};
 			}
 
 			const cli = entry.cliOption;
-			const issues: ParserIssue[] = [];
 
 			if ("valueHint" in cli && cli.valueHint !== undefined) {
 				// ok
 			} else {
-				issues.push(
-					this.buildIssue("UNEXPECTED_FLAG_VALUE", `Flag "${rawKey}" does not accept a user value`, token)
-				);
+				await this._ctx.events.warn('parserUnexpectedFlagValue', { values: { flag: rawKey, scope } });
 			}
 
 			return {
 				kind: "single",
 				token,
 				entry,
-				value,
-				issues
+				value
 			};
 		}
 
@@ -222,29 +248,35 @@ export class ParsingHelpers {
 			const entry = index.byKey[rawKey];
 
 			if (!entry) {
+				switch (phase) {
+					case 'globalFlags':
+						await this._ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: token } });
+						break;
+					case 'moduleFlags':
+						await this._ctx.events.warn('parserUnknownModuleFlag', { values: { flag: token } });
+						break;
+					case 'actionFlags':
+						await this._ctx.events.warn('parserUnknownActionFlag', { values: { flag: token } });
+						break;
+					default: break;
+				}
+
 				return {
 					kind: "unknown",
-					token,
-					issues: [
-						this.buildIssue("UNKNOWN_FLAG", `Unknown flag "${rawKey}" in current scope`, token)
-					]
+					token
 				};
 			}
 
 			const cli = entry.cliOption;
-			const issues: ParserIssue[] = [];
 
 			if ("valueHint" in cli && cli.valueHint !== undefined) {
-				issues.push(
-					this.buildIssue("MISSING_FLAG_VALUE", `Flag "${rawKey}" requires a value`, token)
-				);
+				await this._ctx.events.warn('parserMissingFlagValue', { values: { flag: token, scope } });
 			}
 
 			return {
 				kind: "single",
 				token,
-				entry,
-				issues
+				entry
 			};
 		}
 
@@ -254,7 +286,6 @@ export class ParsingHelpers {
 		const valuePart = eqIndex === -1 ? undefined : body.slice(eqIndex + 1);
 
 		const entries: Array<{ entry: IndexedFlag; value?: string }> = [];
-		const issues: ParserIssue[] = [];
 
 		for (let i = 0; i < groupPart.length; i++) {
 			const char = groupPart[i];
@@ -262,9 +293,18 @@ export class ParsingHelpers {
 			const entry = index.byKey[rawKey];
 
 			if (!entry) {
-				issues.push(
-					this.buildIssue("UNKNOWN_FLAG", `Unknown flag "${rawKey}" in current scope`, token)
-				);
+				switch (phase) {
+					case 'globalFlags':
+						await this._ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: `${rawKey} in group "${token}"` } });
+						break;
+					case 'moduleFlags':
+						await this._ctx.events.warn('parserUnknownModuleFlag', { values: { flag: `${rawKey} in group "${token}"` } });
+						break;
+					case 'actionFlags':
+						await this._ctx.events.warn('parserUnknownActionFlag', { values: { flag: `${rawKey} in group "${token}"` } });
+						break;
+					default: break;
+				}
 				continue;
 			}
 
@@ -273,21 +313,13 @@ export class ParsingHelpers {
 
 			if ("valueHint" in cli && cli.valueHint !== undefined) {
 				if (!isLast) {
-					issues.push(
-						this.buildIssue(
-							"INVALID_SHORT_GROUP",
-							`Flag "${rawKey}" requires a value and cannot appear before the end of a short group`,
-							token
-						)
-					);
+					await this._ctx.events.warn('parserInvalidShortGroup', { values: { flag: rawKey, scope } });
 					entries.push({ entry });
 					continue;
 				}
 
 				if (valuePart === undefined) {
-					issues.push(
-						this.buildIssue("MISSING_FLAG_VALUE", `Flag "${rawKey}" requires a value`, token)
-					);
+					await this._ctx.events.warn('parserMissingFlagValue', { values: { flag: rawKey, scope } });
 					entries.push({ entry });
 					continue;
 				}
@@ -298,13 +330,7 @@ export class ParsingHelpers {
 
 			if ("value" in cli) {
 				if (isLast && valuePart !== undefined) {
-					issues.push(
-						this.buildIssue(
-							"UNEXPECTED_FLAG_VALUE",
-							`Flag "${rawKey}" does not accept a user value`,
-							token
-						)
-					);
+					await this._ctx.events.warn('parserUnexpectedFlagValue', { values: { flag: token, scope } });
 				}
 
 				entries.push({ entry });
@@ -317,20 +343,19 @@ export class ParsingHelpers {
 		return {
 			kind: "group",
 			token,
-			entries,
-			issues
+			entries
 		};
 	}
 
 	/**
 	 * Dispatch helper
 	 */
-	public static parseFlagToken(token: string, index: FlagIndex): ParsedFlagToken {
+	public async parseFlagToken(token: string, index: FlagIndex): Promise<ParsedFlagToken> {
 		if (token.startsWith("--")) {
-			return this.parseLongFlagToken(token, index);
+			return await this.parseLongFlagToken(token, index);
 		}
 
-		return this.parseShortFlagToken(token, index);
+		return await this.parseShortFlagToken(token, index);
 	}
 
 	/**
@@ -341,12 +366,11 @@ export class ParsingHelpers {
 	 * - value resolution
 	 * - metadata tracking
 	 */
-	public static applyFlag(
+	public async applyFlag(
 		entry: IndexedFlag,
 		value: string | undefined,
 		values: Record<string, ParsedOptionValue>,
 		meta: Record<string, ParsedFlagMeta>,
-		issues: ParserIssue[],
 		token: string,
 		keyMode: FlagRuntimeKeyMode
 	) {
@@ -356,14 +380,11 @@ export class ParsingHelpers {
 				: entry.cliOption.long;
 		const optionName = entry.optionName;
 
+		const phase = this._ctx.parser.getPhase();
+		const scope = phase === 'globalFlags' ? 'globals' : phase === 'moduleFlags' ? 'module' : 'action';
+
 		if (this.hasOwn(values, runtimeKey)) {
-			issues.push(
-				this.buildIssue(
-					"DUPLICATE_FLAG_IN_SCOPE",
-					`Duplicate flag for option "${optionName}" in current scope`,
-					token
-				)
-			);
+			await this._ctx.events.warn('parserDuplicateFlag', { values: { flag: token, opt: optionName, scope } });
 			return;
 		}
 
@@ -387,15 +408,14 @@ export class ParsingHelpers {
 	 * - non-flag token
 	 * - "--" stop token
 	 */
-	public static parseFlagsPhase(
+	public async parseFlagsPhase(
 		tokens: string[],
 		startCursor: number,
 		index: FlagIndex,
 		keyMode: FlagRuntimeKeyMode
-	): FlagsPhaseResult {
+	): Promise<FlagsPhaseResult> {
 		const values: Record<string, ParsedOptionValue> = {};
 		const meta: Record<string, ParsedFlagMeta> = {};
-		const issues: ParserIssue[] = [];
 
 		let cursor = startCursor;
 		let stopParsing = false;
@@ -417,81 +437,85 @@ export class ParsingHelpers {
 				break;
 			}
 
-			const parsed = this.parseFlagToken(token, index);
-			issues.push(...parsed.issues);
+			const parsed = await this.parseFlagToken(token, index);
 
 			if (parsed.kind === "single") {
-				this.applyFlag(parsed.entry, parsed.value, values, meta, issues, token, keyMode);
+				await this.applyFlag(parsed.entry, parsed.value, values, meta, token, keyMode);
 			}
 
 			if (parsed.kind === "group") {
 				for (const item of parsed.entries) {
-					this.applyFlag(item.entry, item.value, values, meta, issues, token, keyMode);
+					await this.applyFlag(item.entry, item.value, values, meta, token, keyMode);
 				}
 			}
 
 			cursor++;
+			// Hardcoded help and version detection
+			const hasHelp = values["help"] === true;
+			const hasVersion = values["version"] === true;
+			if (hasHelp || hasVersion) {
+				stopParsing = true;
+				break;
+			}
 		}
 
 		return {
 			cursor,
 			stopParsing,
 			values,
-			meta,
-			issues
+			meta
 		};
 	}
 
 	/**
 	 * Keyword phase (module / action)
 	 */
-	public static parseKeywordPhase(
+	public async parseKeywordPhase(
 		tokens: string[],
 		startCursor: number,
 		code: "MODULE_MISSING" | "ACTION_MISSING",
 		exists?: (keyword: string) => boolean
-	): KeywordPhaseResult {
+	): Promise<KeywordPhaseResult> {
 		let cursor = startCursor;
-		const issues: ParserIssue[] = [];
 		let stopParsing = false;
 
 		if (cursor >= tokens.length) {
-			issues.push(
-				this.buildIssue(code, code === "MODULE_MISSING" ? "Module is missing" : "Action is missing")
-			);
-			return { cursor, stopParsing, issues };
+			if (code === "MODULE_MISSING") await this._ctx.events.warn('parserMissingModule');
+			else await this._ctx.events.warn('parserMissingAction', { values: { module: this._ctx.parser.getDraft().context.module! } });
+			return { cursor, stopParsing };
 		}
 
 		const token = tokens[cursor];
 		if (!token) {
 			stopParsing = true;
 			cursor++;
-			issues.push(
-				this.buildIssue(code, code === "MODULE_MISSING" ? "Module is missing" : "Action is missing", token)
-			);
-			return { cursor, stopParsing, issues };
+			if (code === "MODULE_MISSING") await this._ctx.events.warn('parserMissingModule');
+			else await this._ctx.events.warn('parserMissingAction', { values: { module: this._ctx.parser.getDraft().context.module! } });
+			return { cursor, stopParsing };
 		}
 
 		if (token === "--") {
 			stopParsing = true;
 			cursor++;
-			issues.push(
-				this.buildIssue(code, code === "MODULE_MISSING" ? "Module is missing" : "Action is missing", token)
-			);
-			return { cursor, stopParsing, issues };
+			if (code === "MODULE_MISSING") await this._ctx.events.warn('parserMissingModule');
+			else await this._ctx.events.warn('parserMissingAction', { values: { module: this._ctx.parser.getDraft().context.module! } });
+			return { cursor, stopParsing };
 		}
 
 		if (token.startsWith("-")) {
-			issues.push(
-				this.buildIssue(code, code === "MODULE_MISSING" ? "Module is missing" : "Action is missing", token)
-			);
-			return { cursor, stopParsing, issues };
+			if (code === "MODULE_MISSING") await this._ctx.events.warn('parserMissingModule');
+			else await this._ctx.events.warn('parserMissingAction', { values: { module: this._ctx.parser.getDraft().context.module! } });
+			return { cursor, stopParsing };
 		}
 
 		if (exists && !exists(token)) {
-			issues.push(
-				this.buildIssue(code, `Unknown ${code === "MODULE_MISSING" ? "module" : "action"} "${token}"`, token)
-			);
+			if (code === "MODULE_MISSING") await this._ctx.events.warn('parserUnknownModule', { values: { module: token } });
+			else await this._ctx.events.warn('parserUnknownAction', {
+				values: {
+					module: this._ctx.parser.getDraft().context.module!,
+					action: token
+				}
+			});
 		}
 
 		cursor++;
@@ -499,8 +523,7 @@ export class ParsingHelpers {
 		return {
 			cursor,
 			stopParsing,
-			value: token,
-			issues
+			value: token
 		};
 	}
 
@@ -509,7 +532,7 @@ export class ParsingHelpers {
 	 *
 	 * Collects all remaining tokens as raw args
 	 */
-	public static collectArgsPhase(
+	public collectArgsPhase(
 		tokens: string[],
 		startCursor: number
 	): ArgsPhaseResult {

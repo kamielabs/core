@@ -15,7 +15,7 @@
 
 import { BUILTIN_EVENTS } from "@data";
 import { CoreError, CoreHelpers } from "@helpers";
-import { CoreEventsShape } from "@types";
+import { CoreEventKind, CoreEventPhase, CoreEventLevel, CoreEventsShape, CoreEventsShapeDecl } from "@types";
 
 /**
  * buildEvents
@@ -51,7 +51,7 @@ import { CoreEventsShape } from "@types";
  *
  * @returns Merged events dictionary (builtins + custom)
  */
-export function buildEvents<TCustom extends CoreEventsShape = {}>(custom?: TCustom) {
+export function buildEvents<TCustom extends CoreEventsShape = {}>(custom?: TCustom): CoreEventsShapeDecl<TCustom> {
 	/**
 	 * Prevent override of built-in events.
 	 *
@@ -60,7 +60,32 @@ export function buildEvents<TCustom extends CoreEventsShape = {}>(custom?: TCust
 	 * - 'CORE_' namespace is reserved for internal events
 	 */
 	const keyIndex = new Set<string>();
-	const nameIndex = new Set<string>();
+	const indexes = {
+		byName: {} as Record<string, string>,
+		byKind: {
+			0: [],
+			1: []
+		} as Record<CoreEventKind, string[]>,
+		byPhase: {
+			0: [],
+			1: [],
+			2: [],
+			3: [],
+			4: [],
+			5: [],
+			6: [],
+			7: [],
+			8: []
+		} as Record<CoreEventPhase, string[]>,
+		byLevel: {
+			0: [],
+			1: [],
+			2: [],
+			3: [],
+			4: [],
+			5: []
+		} as Record<CoreEventLevel, string[]>
+	}
 	// 1. index builtins
 	for (const [key, evt] of Object.entries(BUILTIN_EVENTS) as [
 		keyof typeof BUILTIN_EVENTS,
@@ -72,7 +97,6 @@ export function buildEvents<TCustom extends CoreEventsShape = {}>(custom?: TCust
 		 */
 		const expected = CoreHelpers.isValidRuntimeName(
 			key as string,
-			evt.name,
 			true
 		);
 
@@ -84,7 +108,10 @@ export function buildEvents<TCustom extends CoreEventsShape = {}>(custom?: TCust
 		}
 
 		keyIndex.add(key as string);
-		nameIndex.add(evt.name);
+		indexes.byName[evt.name] = key;
+		indexes.byKind[evt.kind].push(key);
+		indexes.byPhase[evt.phase].push(key);
+		indexes.byLevel[evt.level].push(key);
 	}
 
 	if (custom) {
@@ -99,7 +126,6 @@ export function buildEvents<TCustom extends CoreEventsShape = {}>(custom?: TCust
 			 */
 			const expected = CoreHelpers.isValidRuntimeName(
 				key,
-				name,
 				false
 			);
 
@@ -119,7 +145,7 @@ export function buildEvents<TCustom extends CoreEventsShape = {}>(custom?: TCust
 			}
 
 			// 🔒 Builtin Name collision
-			if (nameIndex.has(name)) {
+			if (indexes.byName[name]) {
 				throw new CoreError(
 					'eventDuplicatedName',
 					`Event name "${name}" already exists`
@@ -127,16 +153,19 @@ export function buildEvents<TCustom extends CoreEventsShape = {}>(custom?: TCust
 			}
 
 			// 🔒 Reserved namespace
-			if (name.startsWith('CORE_')) {
+			if (name.startsWith('core.')) {
 				throw new CoreError(
 					'eventNamespace',
-					`Event "${key}" cannot use reserved namespace 'CORE_'`
+					`Event "${key}" cannot use reserved namespace 'core.'`
 				);
 			}
 
 			// register
 			keyIndex.add(key);
-			nameIndex.add(name);
+			indexes.byName[evt.name] = key;
+			indexes.byKind[evt.kind].push(key);
+			indexes.byPhase[evt.phase].push(key);
+			indexes.byLevel[evt.level].push(key);
 		}
 	}
 
@@ -150,10 +179,17 @@ export function buildEvents<TCustom extends CoreEventsShape = {}>(custom?: TCust
 		...(custom ?? {})
 	} as const;
 
+	const shape: CoreEventsShapeDecl<TCustom> = {
+		list: merged as typeof BUILTIN_EVENTS & TCustom,
+		indexes
+	} as const;
+
 	/**
 	 * Type assertion ensures:
 	 * - Built-in events are always present
 	 * - Custom events are merged with correct typing
 	 */
-	return merged as typeof BUILTIN_EVENTS & TCustom;
+	return shape;
+	// return merged as typeof BUILTIN_EVENTS & TCustom;
 }
+

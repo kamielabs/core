@@ -16,13 +16,13 @@ import {
 export const BUILTIN_ENGINE_EVENTS = {
 	// INIT/DICTS FATAL ERRORS
 	engineUnknown: {
-		name: 'CORE_ENGINE_UNKNOWN',
+		name: 'core.engine.unknown',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.runtime
 	},
 	engineUnknownRunner: {
-		name: 'CORE_ENGINE_UNKNOWN_RUNNER',
+		name: 'core.engine.unknown.runner',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.runtime
