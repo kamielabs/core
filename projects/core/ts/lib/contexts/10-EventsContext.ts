@@ -262,3 +262,14 @@ export type SetOutputListenerMethod<
 	TTranslations extends CoreTranslationsShape
 > =
 	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['setOutputListener'];
+
+
+
+export type GetFilteredEventsMethod<
+	TEvents extends CoreEventsShape,
+	TStages extends CoreStagesShape,
+	TGlobals extends CoreGlobalsShape,
+	TModules extends CoreModulesShape,
+	TTranslations extends CoreTranslationsShape
+> =
+	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['getFilteredEvents'];

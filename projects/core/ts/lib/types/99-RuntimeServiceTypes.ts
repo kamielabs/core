@@ -3,7 +3,8 @@ import {
 	RuntimeStageFacts,
 	RuntimeGlobalsFacts,
 	RuntimeModuleFacts,
-	RuntimeI18nFacts
+	RuntimeI18nFacts,
+	ParsedCliContextResult
 } from "@types";
 
 export enum RuntimeStateEnum {
@@ -51,5 +52,6 @@ export type RuntimeFullFacts = {
 	i18n?: RuntimeI18nFacts;
 	globals?: RuntimeGlobalsFacts;
 	module?: RuntimeModuleFacts;
+	parser?: ParsedCliContextResult; // TEMPORARY key for getting parser status for actionHook contexts 'til parser context becomes events
 }
 

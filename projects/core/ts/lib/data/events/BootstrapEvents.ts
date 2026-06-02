@@ -13,26 +13,26 @@ import {
 export const BUILTIN_BOOTSTRAP_EVENTS = {
 	// INIT/DICTS FATAL ERRORS
 	bootstrapAlreadyResolved: {
-		name: 'CORE_BOOTSTRAP_ALREADY_RESOLVED',
+		name: 'core.bootstrap.already.resolved',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.bootstrap
 	},
 	bootstrapMissingResolved: {
-		name: 'CORE_BOOTSTRAP_MISSING_RESOLVED',
+		name: 'core.bootstrap.missing.resolved',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.bootstrap
 	},
 	// FLOW Signals
 	bootstrapInit: {
-		name: 'CORE_BOOTSTRAP_INIT',
+		name: 'core.bootstrap.init',
 		level: CoreEventLevel.trace,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.bootstrap
 	},
 	bootstrapReady: {
-		name: 'CORE_BOOTSTRAP_READY',
+		name: 'core.bootstrap.ready',
 		level: CoreEventLevel.trace,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.bootstrap,

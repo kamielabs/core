@@ -208,22 +208,21 @@ export class CoreHelpers<
 
 	public static isValidRuntimeName(
 		key: string,
-		name: string,
 		isBuiltin: boolean
 	): string {
 		/**
 		 * Convert camelCase to SCREAMING_SNAKE_CASE
 		 */
 		const normalized = key
-			.replace(/([a-z0-9])([A-Z])/g, "$1_$2")
-			.toUpperCase();
+			.replace(/([a-z0-9])([A-Z])/g, "$1.$2")
+			.toLowerCase();
 
 		/**
 		 * Builtin expected format:
-		 * CORE_*
+		 * core.*
 		 */
 		const expected = isBuiltin
-			? `CORE_${normalized}`
+			? `core.${normalized}`
 			: normalized;
 
 		return expected;
@@ -231,9 +230,8 @@ export class CoreHelpers<
 
 	public isValidRuntimeName(
 		key: string,
-		name: string,
 		isBuiltin: boolean
 	) {
-		return CoreHelpers.isValidRuntimeName(key, name, isBuiltin);
+		return CoreHelpers.isValidRuntimeName(key, isBuiltin);
 	}
 }

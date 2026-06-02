@@ -183,3 +183,29 @@ export type CoreErrorsShape = {
 		source: string,
 	}
 }
+
+/**
+ * CoreMetaShape
+ *
+ * Defines the metadata structure for:
+ * - core (framework-level metadata)
+ * - cli (user-level metadata)
+ *
+ * Notes:
+ * - core metadata is controlled by the framework
+ * - cli metadata is expected to be overridden by user configuration
+ */
+export type CoreMetaShape = {
+	core: {
+		version: string;
+		build?: string;
+		author: string;
+		git?: string;
+	},
+	cli: {
+		name?: string | undefined;
+		version?: string | undefined;
+		author?: string | undefined;
+	}
+}
+

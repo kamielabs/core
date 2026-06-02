@@ -91,12 +91,13 @@ export class SnapshotService<
 	public snapshotContext(): SnapshotFullContext<TEvents, TStages, TGlobals, TModules, TTranslations> {
 
 		const snap: SnapshotFullContext<TEvents, TStages, TGlobals, TModules, TTranslations> = {
+			meta: this._ctx.meta.getMeta(),
 			settings: this._ctx.settings,
-			events: this._ctx.events.getEvents(),
-			stages: this._ctx.stages.getDict().stages,
-			i18n: this._ctx.i18n.getDict().translations,
-			globals: this._ctx.globals.getDict().options,
-			modules: this._ctx.modules.getDict().modules,
+			events: this._ctx.events.getDict(),
+			stages: this._ctx.stages.getDict(),
+			i18n: this._ctx.i18n.getDict(),
+			globals: this._ctx.globals.getDict(),
+			modules: this._ctx.modules.getDict(),
 		}
 
 		return snap

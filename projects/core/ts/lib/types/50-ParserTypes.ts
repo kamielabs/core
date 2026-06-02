@@ -33,18 +33,6 @@ export interface EnvIndex {
 	byEnv: Record<string, EnvIndexEntry>;
 }
 
-export interface ParserIssue {
-	code:
-	| "UNKNOWN_FLAG"
-	| "MISSING_FLAG_VALUE"
-	| "UNEXPECTED_FLAG_VALUE"
-	| "DUPLICATE_FLAG_IN_SCOPE"
-	| "INVALID_SHORT_GROUP"
-	| "MODULE_MISSING"
-	| "ACTION_MISSING";
-	message: string;
-	token?: string;
-}
 
 export interface ParsedFlagMeta {
 	groupName: string;
@@ -55,14 +43,12 @@ export type ParsedFlagToken =
 	| {
 		kind: "unknown";
 		token: string;
-		issues: ParserIssue[];
 	}
 	| {
 		kind: "single";
 		token: string;
 		entry: IndexedFlag;
 		value?: string;
-		issues: ParserIssue[];
 	}
 	| {
 		kind: "group";
@@ -71,7 +57,6 @@ export type ParsedFlagToken =
 			entry: IndexedFlag;
 			value?: string;
 		}>;
-		issues: ParserIssue[];
 	};
 
 export type FlagRuntimeKeyMode = "long" | "optionName";
@@ -81,17 +66,21 @@ export interface FlagsPhaseResult {
 	stopParsing: boolean;
 	values: Record<string, ParsedOptionValue>;
 	meta: Record<string, ParsedFlagMeta>;
-	issues: ParserIssue[];
 }
 
 export interface KeywordPhaseResult {
 	cursor: number;
 	stopParsing: boolean;
 	value?: string;
-	issues: ParserIssue[];
 }
 
 export interface ArgsPhaseResult {
 	cursor: number;
 	args: string[];
 }
+
+// Parser Usage Routes Types
+export type CLIHelpMode = "single" | 'modular';
+export type FlagScope = "global" | "module" | "action";
+
+export type UsageRoute = "fullUsage" | "moduleUsage" | "actionUsage" | "flagUsage";

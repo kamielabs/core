@@ -6,9 +6,8 @@ import {
 	buildTranslations
 } from "@builders";
 import { Context, ContextCoreReady } from "@contexts";
-import { FinalEvents, FinalGlobals, FinalModules, FinalStages, FinalTranslations } from "@data";
 import { CoreEngine } from "@engines";
-import { CoreError, CoreHelpers } from "@helpers";
+import { CoreError, CoreHelpers, ModulesHelpers, ParserHelpers } from "@helpers";
 import {
 	BootstrapManager,
 	EventsManager,
@@ -38,7 +37,8 @@ import {
 	CoreGlobalsShape,
 	CoreModulesShape,
 	CLISettings,
-	CoreTranslationsShape
+	CoreTranslationsShape,
+	CLIUserSettings
 } from "@types";
 
 /**
@@ -119,17 +119,17 @@ export class CLI<
 > {
 
 	/**
-	 * Singleton guard.
-	 */
-	private static isInstanciated: boolean = false;
-
-	/**
 	 * Internal execution context.
 	 */
 	private _ctx = {
 		settings: {
 			skipI18nWarnings: false,
-			coreConsoleLevel: 'info',
+			console: {
+				level: 'info',
+				showLevel: false,
+				showTS: false,
+				showPhase: false,
+			},
 			engine: 'fed',
 		},
 		ready: {
@@ -161,14 +161,7 @@ export class CLI<
 	 * - `EventsManager` is created immediately
 	 * - all other managers/services are only instantiated here and initialized later
 	 */
-	private constructor(options: {
-		settings?: CLISettings | undefined;
-		events: FinalEvents<TEvents>,
-		stages: FinalStages<TStages>,
-		translations: FinalTranslations<TTranslations>,
-		globals: FinalGlobals<TGlobals>,
-		modules: FinalModules<TModules>,
-	}) {
+	private constructor(options: CLIUserSettings<TEvents, TStages, TGlobals, TModules, TTranslations>) {
 
 		// Basic CLI settings ovverriding
 		this._overrideSettings(options.settings);
@@ -179,6 +172,8 @@ export class CLI<
 
 		// helpers iare methods available for the core
 		this._ctx.helpers.core = new CoreHelpers(this._ctx);
+		this._ctx.helpers.parser = new ParserHelpers(this._ctx);
+		this._ctx.helpers.modules = new ModulesHelpers(this._ctx);
 		this._ctx.ready.helpers = true;
 
 		// Eventually the real first class, the events, everything else is based on it
@@ -196,14 +191,7 @@ export class CLI<
 	 * At this stage components are only constructed, not fully initialized.
 	 * Their async `init()` methods are executed later by `_initContext()`.
 	 */
-	private _setupContext(options: {
-		settings?: CLISettings | undefined;
-		events: FinalEvents<TEvents>,
-		stages: FinalStages<TStages>,
-		translations: FinalTranslations<TTranslations>,
-		globals: FinalGlobals<TGlobals>,
-		modules: FinalModules<TModules>,
-	}) {
+	private _setupContext(options: CLIUserSettings<TEvents, TStages, TGlobals, TModules, TTranslations>) {
 
 		// Start all services
 		this._ctx.coreconsole = new CoreConsoleService(this._ctx);
@@ -213,7 +201,7 @@ export class CLI<
 		this._ctx.devapi = new ApiService(this._ctx);
 
 		// Start now managers
-		this._ctx.meta = new MetaManager(this._ctx);
+		this._ctx.meta = new MetaManager(this._ctx, options.meta);
 		this._ctx.bootstrap = new BootstrapManager(this._ctx);
 		this._ctx.stages = new StagesManager(this._ctx, options.stages);
 		this._ctx.i18n = new I18nManager(this._ctx, options.translations);
@@ -272,7 +260,13 @@ export class CLI<
 			if (settings.defaultStageName !== undefined) this._ctx.settings.defaultStageName = settings.defaultStageName;
 			if (settings.skipI18nWarnings !== undefined) this._ctx.settings.skipI18nWarnings = settings.skipI18nWarnings;
 			if (settings.engine !== undefined) this._ctx.settings.engine = settings.engine;
-			if (settings.coreConsoleLevel !== undefined) this._ctx.settings.coreConsoleLevel = settings.coreConsoleLevel;
+			if (settings.console !== undefined) {
+				this._ctx.settings.console ??= {};
+				if (settings.console.level !== undefined) this._ctx.settings.console.level = settings.console.level;
+				if (settings.console.showLevel !== undefined) this._ctx.settings.console.showLevel = settings.console.showLevel;
+				if (settings.console.showTS !== undefined) this._ctx.settings.console.showTS = settings.console.showTS;
+				if (settings.console.showPhase !== undefined) this._ctx.settings.console.showPhase = settings.console.showPhase;
+			}
 		}
 	}
 
@@ -334,16 +328,9 @@ export class CLI<
 	): CLI<TEvents, TStages, TGlobals, TModules, TTranslations> {
 
 		try {
-			if (CLI.isInstanciated) {
-				throw new CoreError(
-					"instanceDuplicated",
-					`CLI is already init !`
-				)
-			}
-
-			this.isInstanciated = true;
 
 			const instance = new CLI({
+				meta: options?.meta,
 				settings: options?.settings,
 				translations: buildTranslations(options?.translations),
 				events: buildEvents(options?.events),
@@ -376,13 +363,6 @@ export class CLI<
 	 */
 	public ctx(): Readonly<Context<TEvents, TStages, TGlobals, TModules, TTranslations>> {
 		return this._ctx;
-	}
-
-	/**
-	 * Destroy CLI instance (testing only).
-	 */
-	public static async destroy() {
-		this.isInstanciated = false;
 	}
 
 	/**

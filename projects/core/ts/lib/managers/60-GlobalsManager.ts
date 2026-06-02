@@ -108,8 +108,6 @@ export class GlobalsManager<
 			flagIndex: { byKey: {} },
 			envIndex: { byEnv: {} }
 		} satisfies CoreGlobalsDecl<TGlobals>
-		// this._resolveIndexes();
-		// this._freezeDict();
 	}
 
 	public init: () => Promise<void> = async (): Promise<void> => {
@@ -220,7 +218,7 @@ export class GlobalsManager<
 		const nextPhase = hasDefaultModule ? "args" : "module";
 
 		// Parse CLI globals
-		this._ctx.parser.resolveGlobals(this._dict.flagIndex, nextPhase);
+		await this._ctx.parser.resolveGlobals(this._dict.flagIndex, nextPhase);
 
 		const resolved = this._resolveGlobalsValues(envVars, fileEnv);
 		this._setDraft(resolved);
@@ -330,7 +328,7 @@ export class GlobalsManager<
 						for (const alias of flag.aliases) {
 							if (alias.length === 1) {
 								const shortAliasRawKey = `-${alias}`;
-								if (decl.flagIndex.byKey[alias]) {
+								if (decl.flagIndex.byKey[shortAliasRawKey]) {
 									this._ctx.events.throw('globalsDuplicateFlag', {
 										details: [
 											`${shortAliasRawKey}`
@@ -347,7 +345,7 @@ export class GlobalsManager<
 								};
 							} else {
 								const longAliasRawKey = `--${alias}`
-								if (decl.flagIndex.byKey[alias]) {
+								if (decl.flagIndex.byKey[longAliasRawKey]) {
 									this._ctx.events.throw('globalsDuplicateFlag', {
 										details: [
 											`${longAliasRawKey}`

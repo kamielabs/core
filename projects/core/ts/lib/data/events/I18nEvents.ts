@@ -17,64 +17,64 @@ import {
 export const BUILTIN_I18N_EVENTS = {
 	// INIT/DICTS FATAL ERRORS
 	i18nAlreadyResolved: {
-		name: 'CORE_I18N_ALREADY_RESOLVED',
+		name: 'core.i18n.already.resolved',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.i18n,
 	},
 	i18nMissingResolved: {
-		name: 'CORE_I18N_MISSING_RESOLVED',
+		name: 'core.i18n.missing.resolved',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.i18n,
 	},
 	// FLOW Signals
 	i18nInit: {
-		name: 'CORE_I18N_INIT',
+		name: 'core.i18n.init',
 		level: CoreEventLevel.trace,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.i18n,
 	},
 	i18nReady: {
-		name: 'CORE_I18N_READY',
+		name: 'core.i18n.ready',
 		level: CoreEventLevel.trace,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.i18n,
 	},
 	// I18n Lang & Messages Resolution Fatal & Error
 	i18nMissingLang: {
-		name: 'CORE_I18N_MISSING_LANG',
+		name: 'core.i18n.missing.lang',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.i18n
 	},
 	i18nMissingBuiltinMessage: {
-		name: 'CORE_I18N_MISSING_BUILTIN_MESSAGE',
+		name: 'core.i18n.missing.builtin.message',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.i18n
 	},
 	i18nUnknownKeys: {
-		name: 'CORE_I18N_UNKNOWN_KEYS',
+		name: 'core.i18n.unknown.keys',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.i18n
 	},
 	// I18n warnings, issued but not blocking core to run
 	i18nMissingKeys: {
-		name: 'CORE_I18N_MISSING_KEYS',
+		name: 'core.i18n.missing.keys',
 		level: CoreEventLevel.warning,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.i18n
 	},
 	i18nMissingMessageValues: {
-		name: 'CORE_I18N_MISSING_MESSAGE_VALUES',
+		name: 'core.i18n.missing.message.values',
 		level: CoreEventLevel.warning,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.i18n
 	},
 	i18nFallbackUsed: {
-		name: 'CORE_I18N_FALLBACK_USED',
+		name: 'core.i18n.fallback.used',
 		level: CoreEventLevel.warning,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.i18n

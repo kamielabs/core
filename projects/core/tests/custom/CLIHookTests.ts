@@ -44,11 +44,11 @@ export function addModules() {
 	// 	console.log(runtime.module);
 	// })
 
-	cli.hooks().onModuleAction('test', '__defaultAction__', async ({ tools }) => {
+	cli.hooks().onModuleAction('test', '__defaultAction__', async ({ runtime, tools }) => {
 
 		console.log("Hooking ! action test.__defaultAction__ OK !");
 		await tools.message.info('testEventCustom1');
-		// console.log(runtime.globals)
+		console.log(runtime.bootstrap!.script.full)
 		// console.log(runtime.module)
 		// console.log(options)
 	});

@@ -159,6 +159,7 @@ export class ToolsService<
 				warn: (key, options) => this._ctx.events.messageWarn(key, options),
 				throw: (key, options) => this._ctx.events.messageThrow(key, options),
 			},
+			getEvents: (filter) => this._ctx.events.getFilteredEvents(filter)
 		};
 	}
 
@@ -187,6 +188,7 @@ export class ToolsService<
 				warn: (key, options) => this._ctx.events.messageWarn(key, options),
 				throw: (key, options) => this._ctx.events.messageThrow(key, options),
 			},
+			getEvents: (filter) => this._ctx.events.getFilteredEvents(filter)
 		};
 	}
 

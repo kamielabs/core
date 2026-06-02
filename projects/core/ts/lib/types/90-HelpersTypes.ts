@@ -1,4 +1,4 @@
-import { CoreHelpers } from "@helpers";
+import { CoreHelpers, ModulesHelpers, ParserHelpers } from "@helpers";
 import {
 	CoreEventsShape,
 	CoreStagesShape,
@@ -15,5 +15,7 @@ export interface HelpersContext<
 	TTranslations extends CoreTranslationsShape
 > {
 	core: CoreHelpers<TEvents, TStages, TGlobals, TModules, TTranslations>
+	parser: ParserHelpers<TEvents, TStages, TGlobals, TModules, TTranslations>
+	modules: ModulesHelpers<TEvents, TStages, TGlobals, TModules, TTranslations>
 }
 

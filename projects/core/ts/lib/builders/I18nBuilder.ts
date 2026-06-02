@@ -80,7 +80,6 @@ export function buildTranslations<TCustom extends CoreTranslationsShape = {}>(
 			 */
 			const expected = CoreHelpers.isValidRuntimeName(
 				key,
-				msg.name,
 				true
 			);
 
@@ -144,10 +143,10 @@ export function buildTranslations<TCustom extends CoreTranslationsShape = {}>(
 			/**
 			 * Custom namespace restriction.
 			 */
-			if (msg.name.startsWith("CORE_")) {
+			if (msg.name.startsWith("core.")) {
 				throw new CoreError(
 					"i18nNameSpace",
-					`Custom translation "${key}" cannot use reserved namespace 'CORE_'`
+					`Custom translation "${key}" cannot use reserved namespace 'core.'`
 				);
 			}
 
@@ -156,7 +155,6 @@ export function buildTranslations<TCustom extends CoreTranslationsShape = {}>(
 			 */
 			const expected = CoreHelpers.isValidRuntimeName(
 				key,
-				msg.name,
 				false
 			);
 

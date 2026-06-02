@@ -7,7 +7,7 @@ export const GLOBAL_VERSION_ENV = '_NODE_CLI_VERSION';
 const helpGlobal: GlobalOption<typeof GLOBAL_HELP_ENV, boolean> = {
 	env: GLOBAL_HELP_ENV,
 	default: false,
-	description: "Show Help from Global Options",
+	description: "show help",
 	cli: [{
 		long: "help",
 		short: "h",
@@ -18,7 +18,7 @@ const helpGlobal: GlobalOption<typeof GLOBAL_HELP_ENV, boolean> = {
 const versionGlobal: GlobalOption<typeof GLOBAL_VERSION_ENV, boolean> = {
 	env: GLOBAL_VERSION_ENV,
 	default: false,
-	description: "Show version from Global Options",
+	description: "show version",
 	cli: [{
 		long: "version",
 		short: "v",

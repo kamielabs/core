@@ -16,38 +16,38 @@ import {
 export const BUILTIN_STAGES_EVENTS = {
 	// INIT/DICTS FATAL ERRORS
 	stagesMissingDraft: {
-		name: 'CORE_STAGES_MISSING_DRAFT',
+		name: 'core.stages.missing.draft',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.stage,
 	},
 	stagesAlreadyResolved: {
-		name: 'CORE_STAGES_ALREADY_RESOLVED',
+		name: 'core.stages.already.resolved',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.stage,
 	},
 	stagesMissingResolved: {
-		name: 'CORE_STAGES_MISSING_RESOLVED',
+		name: 'core.stages.missing.resolved',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.stage,
 	},
 	// FLOW Signals
 	stageInit: {
-		name: 'CORE_STAGE_INIT',
+		name: 'core.stage.init',
 		level: CoreEventLevel.trace,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.stage,
 	},
 	stageHooking: {
-		name: 'CORE_STAGE_HOOKING',
+		name: 'core.stage.hooking',
 		level: CoreEventLevel.trace,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.stage,
 	},
 	stageReady: {
-		name: 'CORE_STAGE_READY',
+		name: 'core.stage.ready',
 		level: CoreEventLevel.trace,
 		kind: CoreEventKind.message,
 		phase: CoreEventPhase.stage,
@@ -55,31 +55,31 @@ export const BUILTIN_STAGES_EVENTS = {
 	},
 	// Stage Resolution Fatal Errors
 	stageDuplicateEnv: {
-		name: 'CORE_STAGE_DUPLICATE_ENV',
+		name: 'core.stage.duplicate.env',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.stage
 	},
 	stageMissing: {
-		name: 'CORE_STAGE_MISSING',
+		name: 'core.stage.missing',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.stage
 	},
 	stageMissingFile: {
-		name: 'CORE_STAGE_MISSING_FILE',
+		name: 'core.stage.missing.file',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.stage
 	},
 	stageMissingLang: {
-		name: 'CORE_STAGE_MISSING_LANG',
+		name: 'core.stage.missing.lang',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.stage
 	},
 	stageMissingWorkingDir: {
-		name: 'CORE_STAGE_MISSING_WORKING_DIR',
+		name: 'core.stage.missing.working.dir',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.stage

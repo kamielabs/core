@@ -29,16 +29,16 @@ import {
 	ModuleAction,
 	BuiltinModuleWithOptionsKey,
 	CustomModuleWithOptionsKey,
-	RuntimeGlobalsFacts
+	RuntimeGlobalsFacts,
+	RuntimeCoreEvent,
+	UsageRoute,
+	ModuleFlagIndexEntry,
+	ActionFlagIndexEntry
 } from "@types";
 
 import { BUILTIN_MODULES, FinalModules } from "@data";
 
-import {
-	ModulesHelpers
-} from "@helpers";
-
-import { helpShow, versionShow } from "@data/modules";
+import { helpAction, versionAction } from "@data/modules";
 
 /**
  * TODO: V0.1: Setup runner() real behavior with ignoring parserIssues and sending to help
@@ -196,11 +196,11 @@ export class ModulesManager<
 	 * module/action resolution is attempted.
 	 */
 	public init: () => Promise<void> = async (): Promise<void> => {
-		this._resolveIndexes();
+		await this._resolveIndexes();
 
 		// Register builtin actions
-		this._registerBuiltinActionHook('help', 'show', helpShow());
-		this._registerBuiltinActionHook('version', 'show', versionShow());
+		this._registerBuiltinActionHook('help', '__defaultAction__', helpAction());
+		this._registerBuiltinActionHook('version', '__defaultAction__', versionAction());
 
 		this._freezeDict();
 	};
@@ -314,7 +314,7 @@ export class ModulesManager<
 	 * it prepares lookup structures used later by parser-driven runtime resolution.
 	 *
 	 */
-	private _resolveIndexes() {
+	private async _resolveIndexes() {
 		const modules = this._getModuleEntries();
 
 		const customModules = modules.filter(([name]) => !(name in BUILTIN_MODULES));
@@ -335,9 +335,9 @@ export class ModulesManager<
 					this._dict.moduleIndex.byAlias[alias] = moduleName;
 				}
 			}
+			await this._resolveModuleFlags(moduleName, module);
 
-			this._resolveActionIndexes(moduleName, module);
-			this._resolveModuleFlags(moduleName, module);
+			await this._resolveActionIndexes(moduleName, module);
 		}
 	}
 
@@ -407,7 +407,7 @@ export class ModulesManager<
 	 * - `defaultAction`
 	 * - `singleAction`
 	 */
-	private _resolveActionIndexes(
+	private async _resolveActionIndexes(
 		moduleName: string,
 		module: ModuleInfos
 	) {
@@ -453,7 +453,7 @@ export class ModulesManager<
 	 *
 	 * Only applies to modules with explicit "actions" container.
 	 */
-	private _resolveModuleFlags(
+	private async _resolveModuleFlags(
 		moduleName: string,
 		module: ModuleInfos
 	) {
@@ -467,23 +467,50 @@ export class ModulesManager<
 
 			const index = this._dict.flagIndex.module[moduleName].byKey;
 
-			for (const optionName in module.options) {
+			for (const [optionName, option] of Object.entries(module.options)) {
 
-				const option = module.options[optionName];
+				// const option = module.options[optionName];
 				if (!option) continue;
 
-				index[`--${option.long}`] = {
+				const longFlag = `--${option.long}`;
+				if (index[longFlag]) this._ctx.events.throw('moduleDuplicateFlag', {
+					details: [
+						`module: ${moduleName}`,
+						`flag: ${longFlag}`
+					]
+				});
+
+				const entry: ModuleFlagIndexEntry = {
 					scope: "module",
 					module: moduleName,
 					optionName
-				};
+				}
+
+				index[longFlag] = entry;
 
 				if (option.short) {
-					index[`-${option.short}`] = {
-						scope: "module",
-						module: moduleName,
-						optionName
-					};
+					const shortFlag = `-${option.short}`;
+					if (index[shortFlag]) this._ctx.events.throw('moduleDuplicateFlag', {
+						details: [
+							`module: ${moduleName}`,
+							`flag: ${shortFlag}`
+						]
+					});
+					index[shortFlag] = entry;
+				}
+
+				if (option.aliases?.length) {
+					for (const alias of option.aliases) {
+						const aliasFlag = alias.length === 1 ? `-${alias}` : `--${alias}`;
+						if (index[aliasFlag]) this._ctx.events.throw('moduleDuplicateFlag', {
+							details: [
+								`module: ${moduleName}`,
+								`flag: ${aliasFlag}`
+							]
+						});
+						index[aliasFlag] = entry;
+
+					}
 				}
 			}
 		}
@@ -508,26 +535,55 @@ export class ModulesManager<
 		this._dict.flagIndex.action[moduleName] ??= {};
 		this._dict.flagIndex.action[moduleName][actionName] ??= { byKey: {} };
 
-		for (const optionName in options) {
-			const option = options[optionName];
-			if (!option) continue;
+		const index = this._dict.flagIndex.action[moduleName][actionName].byKey;
+		for (const [optionName, option] of Object.entries(options)) {
 
-			const index = this._dict.flagIndex.action[moduleName][actionName].byKey;
-
-			index[`--${option.long}`] = {
+			const entry: ActionFlagIndexEntry = {
 				scope: "action",
 				module: moduleName,
 				action: actionName,
 				optionName
-			};
+			}
+			// const option = module.options[optionName];
+			if (!option) continue;
+
+			const longFlag = `--${option.long}`;
+			if (index[longFlag]) this._ctx.events.throw('actionDuplicateFlag', {
+				details: [
+					`module: ${moduleName}`,
+					`action: ${actionName}`,
+					`flag: ${longFlag}`
+				]
+			});
+
+
+			index[longFlag] = entry;
 
 			if (option.short) {
-				index[`-${option.short}`] = {
-					scope: "action",
-					module: moduleName,
-					action: actionName,
-					optionName
-				};
+				const shortFlag = `-${option.short}`;
+				if (index[shortFlag]) this._ctx.events.throw('actionDuplicateFlag', {
+					details: [
+						`module: ${moduleName}`,
+						`action: ${actionName}`,
+						`flag: ${shortFlag}`
+					]
+				});
+				index[shortFlag] = entry;
+			}
+
+			if (option.aliases?.length) {
+				for (const alias of option.aliases) {
+					const aliasFlag = alias.length === 1 ? `-${alias}` : `--${alias}`;
+					if (index[aliasFlag]) this._ctx.events.throw('actionDuplicateFlag', {
+						details: [
+							`module: ${moduleName}`,
+							`action: ${actionName}`,
+							`flag: ${aliasFlag}`
+						]
+					});
+					index[aliasFlag] = entry;
+
+				}
 			}
 		}
 	}
@@ -573,7 +629,7 @@ export class ModulesManager<
 	 * deferred to `runner()`, which is called later by the selected engine.
 	 */
 	public async resolve(): Promise<void> {
-		const draft = this._resolveRuntime();
+		const draft = await this._resolveRuntime();
 		this._setDraft(draft);
 
 
@@ -605,7 +661,7 @@ export class ModulesManager<
 	 * - single-module shortcut
 	 * - standard parser-driven module/action resolution
 	 */
-	private _resolveRuntime(): RuntimeModuleFacts {
+	private async _resolveRuntime(): Promise<RuntimeModuleFacts> {
 		const parser = this._ctx.parser;
 		const dict = this.getDict();
 
@@ -616,24 +672,24 @@ export class ModulesManager<
 		const overrideAction = this._resolveBuiltinOverride(this._ctx.globals.getResolved()!);
 
 		if (overrideAction) {
-			parser.finalizeArgsPhase();
+			await parser.resolveModule(
+				dict.moduleIndex,
+				dict.actionIndex,
+				this._ctx.helpers.modules.buildParserFlagIndexFromModule(dict.modules, moduleFlags),
+				this._ctx.helpers.modules.buildParserFlagIndexFromAction(dict.modules, actionFlags),
+				overrideAction
+			);
+
 
 			const parsed = parser.getContext();
 
-			return overrideAction === "help"
-				? {
-					moduleName: "help",
-					moduleOptions: {},
-					actionName: 'show',
-					actionOptions: {},
-					args: parsed.args ?? []
-				} : {
-					moduleName: "version",
-					moduleOptions: {},
-					actionName: 'show',
-					actionOptions: {},
-					args: parsed.args ?? []
-				}
+			return {
+				moduleName: parsed.module!,
+				moduleOptions: {},
+				actionName: parsed.action!,
+				actionOptions: parsed.actionOptions ?? {},
+				args: parsed.args ?? []
+			}
 		}
 
 		if (this._isSingleModuleRuntime()) {
@@ -650,11 +706,11 @@ export class ModulesManager<
 			};
 		}
 
-		parser.resolveModule(
+		await parser.resolveModule(
 			dict.moduleIndex,
 			dict.actionIndex,
-			ModulesHelpers.buildParserFlagIndexFromModule(dict.modules, moduleFlags),
-			ModulesHelpers.buildParserFlagIndexFromAction(dict.modules, actionFlags)
+			this._ctx.helpers.modules.buildParserFlagIndexFromModule(dict.modules, moduleFlags),
+			this._ctx.helpers.modules.buildParserFlagIndexFromAction(dict.modules, actionFlags)
 		);
 
 
@@ -669,6 +725,84 @@ export class ModulesManager<
 		};
 	}
 
+	private _resolveUsageRoute(events: RuntimeCoreEvent<string>[]): UsageRoute {
+		if (events.length !== 1) { return "fullUsage"; }
+		const event = events[0]!;
+		switch (event.name) {
+			case 'CORE_PARSER_UNKNOWN_MODULE':
+				return "fullUsage";
+			case 'CORE_PARSER_MISSING_MODULE':
+				return "fullUsage";
+			case 'CORE_PARSER_UNKNOWN_ACTION':
+				return "moduleUsage";
+			case 'CORE_PARSER_MISSING_ACTION':
+				return "moduleUsage";
+			case 'CORE_PARSER_UNKNOWN_GLOBAL_FLAG':
+				return "fullUsage";
+			case 'CORE_PARSER_UNKNOWN_MODULE_FLAG':
+				return "moduleUsage";
+			case 'CORE_PARSER_UNKNOWN_ACTION_FLAG':
+				return "actionUsage";
+			case 'CORE_PARSER_DUPLICATE_FLAG':
+				return "flagUsage";
+			case 'CORE_PARSER_MISSING_FLAG_VALUE':
+				return "flagUsage";
+			case 'CORE_PARSER_UNEXPECTED_FLAG_VALUE':
+				return "flagUsage";
+			case 'CORE_PARSER_INVALID_SHORT_GROUP':
+				return "flagUsage";
+			default: return "fullUsage";
+		}
+	}
+
+	public usage: (issues: RuntimeCoreEvent<string>[]) => Promise<void> = async (issues) => {
+		const hasIssues = issues.length > 0;
+		// If no warning  get out and continue
+		if (!hasIssues) return;
+		const mode = "__defaultModule__" in this._ctx.snapshot.snapshotContext().modules ? 'single' : 'modular';
+
+		const bootstrap = this._ctx.bootstrap.getResolved();
+
+		const bin = bootstrap.script.ext === "js" ? "node" : "tsx"
+		const script = bin + " " + bootstrap.script.file;
+
+		const route = this._resolveUsageRoute(issues);
+		const firstIssue = issues[0]!;
+
+		const helpCli = mode === 'single'
+			? `${script} --help`
+			: `${script} help`;
+
+		const module = this._ctx.modules.getResolved().moduleName
+		const action = this._ctx.modules.getResolved().actionName;
+
+		const fullUsageMode = mode === "single" ? 'parserUsageSingle' : 'parserUsageModular';
+
+		switch (route) {
+			case 'fullUsage': return this._ctx.events.throw(fullUsageMode, { values: { helpCli } })
+			case 'moduleUsage': return this._ctx.events.throw('parserUsageModule', { values: { helpCli, module } });
+			case 'actionUsage': {
+				if (action === "__defaultAction__") return this._ctx.events.throw('parserUsageModule', { values: { helpCli, module } });
+				return this._ctx.events.throw('parserUsageAction', { values: { helpCli, module, action } });
+			}
+			case 'flagUsage': {
+				const flag = firstIssue.values?.flag;
+				const scope = firstIssue.values?.scope;
+				if (flag === undefined || scope === undefined) return this._ctx.events.throw(fullUsageMode, { values: { helpCli } });
+				switch (scope) {
+					case 'globals': return this._ctx.events.throw('parserUsageGlobalFlag', { values: { helpCli, flag } });
+					case 'module': return this._ctx.events.throw('parserUsageModuleFlag', { values: { helpCli, flag, module } });
+					case 'action': {
+						if (action === "__defaultAction__") return this._ctx.events.throw('parserUsageModuleFlag', { values: { helpCli, flag, module } });
+						return this._ctx.events.throw('parserUsageActionFlag', { values: { helpCli, flag, module, action } });
+					}
+					default: return this._ctx.events.throw(fullUsageMode, { values: { helpCli } });
+				}
+			}
+			default: return this._ctx.events.throw(fullUsageMode, { values: { helpCli } });
+		}
+	}
+
 	// -----------------------------------------------------
 	// RUNNER
 	// -----------------------------------------------------
@@ -677,7 +811,7 @@ export class ModulesManager<
 	 * Execute resolved action.
 	 *
 	 * Behavior:
-	 * - If parser issues exist → fallback to help
+	 * - If parser issues exist → fallback to internal usage modules method
 	 * - Resolve corresponding action hook
 	 * - Execute hook with runtime context
 	 * - Centralize the final redirection logic before userland execution
@@ -688,23 +822,15 @@ export class ModulesManager<
 	 *
 	 */
 	public runner: () => Promise<void> = async () => {
-		const issues = this._ctx.parser.getIssues();
 
-		let moduleName: string;
-		let actionName: string;
-		let hook: ActionHook<TEvents, TStages, TGlobals, TModules, TTranslations> | undefined;
+		const issues = this._ctx.events.getFilteredEvents({ phase: "parser", level: "warning" });
+		await this._ctx.modules.usage(issues);
+
 
 		const resolved = this._ctx.modules.getResolved();
-		if (issues.length > 0) {
-			moduleName = "help";
-			actionName = "show";
-			hook = this._ctx.modules.getActionHook(moduleName, actionName);
-		} else {
-			moduleName = resolved.moduleName;
-			actionName = resolved.actionName;
-			hook = this._ctx.modules.getActionHook(moduleName, actionName);
-		}
-
+		const moduleName = resolved.moduleName;
+		const actionName = resolved.actionName;
+		const hook = this._ctx.modules.getActionHook(moduleName, actionName);
 
 		if (!hook) {
 			this._ctx.events.throw('modulesMissingActionHook', {
@@ -714,9 +840,11 @@ export class ModulesManager<
 
 		await hook({
 			options: resolved.actionOptions,
+			args: resolved.args,
 			runtime: this._ctx.runtime.actionContext(),
 			tools: this._ctx.tools.actionContext(),
 			snapshot: this._ctx.snapshot.snapshotContext(),
+			live: { events: this._ctx.events.getLive().list }
 		});
 	}
 

@@ -1,4 +1,4 @@
 // ⚙️ Auto-generated file — DO NOT EDIT
 
-export * from "./help";
-export * from "./version";
+export * from "./helpAction";
+export * from "./versionAction";

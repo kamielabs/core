@@ -8,6 +8,6 @@ export * from "./40-StagesTypes";
 export * from "./50-ParserTypes";
 export * from "./60-GlobalsTypes";
 export * from "./70-ModulesTypes";
-export * from "./80-RuntimeServiceTypes";
+export * from "./80-CLITypes";
 export * from "./90-HelpersTypes";
-export * from "./99-CLITypes";
+export * from "./99-RuntimeServiceTypes";

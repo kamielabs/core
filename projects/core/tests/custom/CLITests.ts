@@ -1,23 +1,34 @@
+#!/usr/bin/env tsx
 import { CoreEventKind, CoreEventLevel, CoreEventPhase } from "@types";
 import { CLI } from "@core";
 import { addModules, configureCLI, setStageBuiltinDefaults } from "./CLIHookTests";
 
 export const cli = CLI.init({
+	meta: {
+		name: "Test CLI",
+		version: "0.2.0",
+		author: "k4mie"
+	},
 	settings: {
 		skipI18nWarnings: false,
-		coreConsoleLevel: 'trace',
+		console: {
+			level: 'info',
+			showLevel: false,
+			showTS: false,
+			showPhase: false
+		},
 		defaultStageName: "dev",
 		engine: "fed"
 	},
 	events: {
 		testEventCustom1: {
-			name: "TEST_EVENT_CUSTOM1",
+			name: "test.event.custom1",
 			phase: CoreEventPhase.runtime,
 			kind: CoreEventKind.message,
 			level: CoreEventLevel.info
 		},
 		testEventCustom2: {
-			name: "TEST_EVENT_CUSTOM2",
+			name: "test.event.custom2",
 			phase: CoreEventPhase.runtime,
 			kind: CoreEventKind.signal,
 			level: CoreEventLevel.error
@@ -39,13 +50,27 @@ export const cli = CLI.init({
 	},
 	globals: {
 		customGlobalGroup1: {
+			testGlobalNoFlag: {
+				env: 'OPT_NO_FLAG_GLOBAL',
+				default: false,
+				description: "No Flag Global Option"
+			},
 			testGlobal1: {
 				env: 'OPT_GLOBAL',
 				default: false,
+				description: "Gestion Globale de test",
 				cli: [{
 					long: 'global',
 					short: 'g',
+					aliases: ["gggg", "x"],
+					description: "Test Cli Flag",
 					value: true
+				}, {
+					long: "test",
+					short: "z",
+					aliases: ["r"],
+					description: "Test 2",
+					valueHint: "<value>"
 				}]
 			},
 			testGlobal2: {
@@ -54,6 +79,7 @@ export const cli = CLI.init({
 				cli: [{
 					long: 'global2',
 					short: 'n',
+					aliases: ["m"],
 					value: true
 				}]
 			}
@@ -62,9 +88,15 @@ export const cli = CLI.init({
 
 	},
 	translations: {
+		en: {
+			testEventCustom1: {
+				name: 'test.event.custom1',
+				content: "Custom Test 1"
+			}
+		},
 		es: {
 			testEventCustom1: {
-				name: 'TEST_EVENT_CUSTOM4',
+				name: 'test.event.custom1',
 				title: 'Maque !',
 				description: 'Quesadillas ! ! ! '
 			}
@@ -85,8 +117,14 @@ export const cli = CLI.init({
 					description: 'test action',
 					options: {
 						addTest: {
+							description: "Add a value",
 							long: "add",
 							short: "a",
+							valueHint: "<value>"
+						},
+						addTest2: {
+							description: "Add2 test",
+							long: "add2",
 							valueHint: "<value>"
 						}
 					}
@@ -94,31 +132,46 @@ export const cli = CLI.init({
 			}
 		},
 		test2: {
+			aliases: ["test3", "t"],
+			description: "Test Module 2ème du nom",
 			options: {
-				moduleFlag: {
+				moduleFlag2: {
 					long: "moduleFlag",
+					short: "a",
+					aliases: ["t"],
 					value: "moduleFlag"
 				},
 				add: {
+					description: "Add a value",
 					long: "add",
+					short: "z",
+					aliases: ["bla"],
 					valueHint: "<value>"
 				}
 			},
 			actions: {
 				"testAction": {
+					aliases: ["ta"],
 					description: "test",
+					argsHint: ["[id] [name]"],
 					options: {
 						add: {
+							description: "Add a value",
 							long: "add",
 							short: "a",
+							aliases: ["addAlias"],
 							valueHint: "<value>"
 						},
 						delTest: {
+							description: "Remove a value",
 							long: "del",
 							short: "d",
 							valueHint: "<value>"
 						}
 					}
+				},
+				act2: {
+					description: "Action 2 from test 2"
 				}
 			}
 		}

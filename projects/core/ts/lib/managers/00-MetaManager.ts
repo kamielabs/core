@@ -9,35 +9,12 @@ import { Context } from "@contexts";
 import {
 	CoreEventsShape,
 	CoreGlobalsShape,
+	CoreMetaShape,
 	CoreModulesShape,
 	CoreStagesShape,
 	CoreTranslationsShape
 } from "@types";
 
-/**
- * CoreMetaShape
- *
- * Defines the metadata structure for:
- * - core (framework-level metadata)
- * - cli (user-level metadata)
- *
- * Notes:
- * - core metadata is controlled by the framework
- * - cli metadata is expected to be overridden by user configuration
- */
-export type CoreMetaShape = {
-	core: {
-		version: string;
-		build?: string;
-		author: string;
-		git?: string;
-	},
-	cli: {
-		name?: string;
-		version?: string;
-		author?: string;
-	}
-}
 
 /**
  * MetaManager
@@ -76,14 +53,18 @@ export class MetaManager<
 	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
 	private _meta: CoreMetaShape;
 
-	constructor(ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>) {
+	constructor(ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>, cliMeta?: Partial<CoreMetaShape["cli"]>) {
 		this._ctx = ctx;
 		this._meta = {
 			core: {
 				version: "0.1.0",
 				author: "k4mie"
 			},
-			cli: {}
+			cli: {
+				name: cliMeta?.name,
+				version: cliMeta?.version,
+				author: cliMeta?.author
+			}
 		} satisfies CoreMetaShape;
 	}
 

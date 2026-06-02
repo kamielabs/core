@@ -1,11 +1,6 @@
 import { Context } from "@contexts";
 
 import {
-	ParsingHelpers,
-	ModulesHelpers
-} from "@helpers";
-
-import {
 	CoreEventsShape,
 	CoreStagesShape,
 	CoreGlobalsShape,
@@ -14,7 +9,6 @@ import {
 	FlagIndex,
 	RuntimeCliContext,
 	ParsedCliContextResult,
-	ParserIssue,
 	ModuleIndex,
 	ActionIndex,
 	CoreTranslationsShape
@@ -101,7 +95,6 @@ export class ParserManager<
 	private _draft: ParsedCliContextResult | undefined = {
 		context: {},
 		ignored: [],
-		issues: []
 	};
 
 	private _resolved?: ParsedCliContextResult;
@@ -237,7 +230,7 @@ export class ParserManager<
 	 * @param nextPhase - Next phase ("module" or "args")
 	 *
 	 */
-	public resolveGlobals(flagIndex: FlagIndex, nextPhase: 'module' | 'args' = 'module') {
+	public async resolveGlobals(flagIndex: FlagIndex, nextPhase: 'module' | 'args' = 'module') {
 
 		const neededPhase = 'globalFlags';
 
@@ -247,7 +240,7 @@ export class ParserManager<
 			});
 		}
 
-		const parsed = ParsingHelpers.parseFlagsPhase(
+		const parsed = await this._ctx.helpers.parser.parseFlagsPhase(
 			this.tokens,
 			this.cursor,
 			flagIndex,
@@ -274,14 +267,13 @@ export class ParserManager<
 
 		this.getDraft().context.globals = grouped;
 
-		this.getDraft().issues.push(...parsed.issues);
 
 		// Hardcoded help and version detection
 		const hasHelp = parsed.values["help"] === true;
 		const hasVersion = parsed.values["version"] === true;
 
 		if (hasHelp || hasVersion) {
-			this.phase = "args";
+			this.phase = "module";
 		} else {
 			this.phase = nextPhase;
 		}
@@ -338,11 +330,12 @@ export class ParserManager<
 	 * @param actionFlagIndex - Optional action flags index
 	 *
 	 */
-	public resolveModule(
+	public async resolveModule(
 		moduleIndex: ModuleIndex,
 		actionIndex: ActionIndex,
 		moduleFlagIndex?: FlagIndex,
-		actionFlagIndex?: FlagIndex
+		actionFlagIndex?: FlagIndex,
+		forceModule?: string,
 	) {
 
 		const neededPhase = 'module';
@@ -354,28 +347,40 @@ export class ParserManager<
 		}
 
 		const draft = this.getDraft();
+
 		// -------------------------------------------------
 		// MODULE KEYWORD
 		// -------------------------------------------------
 
-		const moduleResult = ParsingHelpers.parseKeywordPhase(
-			this.tokens,
-			this.cursor,
-			"MODULE_MISSING",
-			(name) => ModulesHelpers.moduleExists(moduleIndex, name)
-		);
-
-		this.cursor = moduleResult.cursor;
-		this.stop = moduleResult.stopParsing;
-
-		draft.issues.push(...moduleResult.issues);
-
 		let moduleShape;
 
-		if (moduleResult.value) {
-			const resolved = ModulesHelpers.resolveModuleName(moduleIndex, moduleResult.value);
-			draft.context.module = resolved;
-			moduleShape = moduleIndex.byName[resolved];
+		if (forceModule) {
+
+			draft.context.module = forceModule;
+			moduleShape = moduleIndex.byName[forceModule];
+
+		} else {
+
+			const moduleResult = await this._ctx.helpers.parser.parseKeywordPhase(
+				this.tokens,
+				this.cursor,
+				"MODULE_MISSING",
+				(name) => this._ctx.helpers.modules.moduleExists(moduleIndex, name)
+			);
+
+			this.cursor = moduleResult.cursor;
+			this.stop = moduleResult.stopParsing;
+
+			if (moduleResult.value) {
+
+				const resolved = this._ctx.helpers.modules.resolveModuleName(
+					moduleIndex,
+					moduleResult.value
+				);
+
+				draft.context.module = resolved;
+				moduleShape = moduleIndex.byName[resolved];
+			}
 		}
 
 		if (!moduleShape) {
@@ -398,7 +403,7 @@ export class ParserManager<
 
 			this.phase = "moduleFlags";
 
-			const moduleFlags = ParsingHelpers.parseFlagsPhase(
+			const moduleFlags = await this._ctx.helpers.parser.parseFlagsPhase(
 				this.tokens,
 				this.cursor,
 				moduleFlagIndex,
@@ -409,8 +414,6 @@ export class ParserManager<
 			this.stop = moduleFlags.stopParsing;
 
 			draft.context.moduleOptions = moduleFlags.values;
-
-			draft.issues.push(...moduleFlags.issues);
 
 			if (this.stop) {
 				this.phase = "args";
@@ -423,24 +426,24 @@ export class ParserManager<
 		// ACTION KEYWORD
 		// -------------------------------------------------
 
+		this.phase = "action";
+
 		if (hasDefaultAction) {
 
-			this.phase = "action";
-
-			const defaultAction = Object.keys(moduleShape.defaultAction!)[0];
+			const defaultAction = Object.keys(
+				moduleShape.defaultAction!
+			)[0];
 
 			draft.context.action = defaultAction;
 
 		} else {
 
-			this.phase = "action";
-
-			const actionResult = ParsingHelpers.parseKeywordPhase(
+			const actionResult = await this._ctx.helpers.parser.parseKeywordPhase(
 				this.tokens,
 				this.cursor,
 				"ACTION_MISSING",
 				(action) =>
-					ModulesHelpers.actionExists(
+					this._ctx.helpers.modules.actionExists(
 						actionIndex,
 						draft.context.module!,
 						action
@@ -450,11 +453,9 @@ export class ParserManager<
 			this.cursor = actionResult.cursor;
 			this.stop = actionResult.stopParsing;
 
-			draft.issues.push(...actionResult.issues);
-
 			if (actionResult.value) {
 
-				const resolved = ModulesHelpers.resolveActionName(
+				const resolved = this._ctx.helpers.modules.resolveActionName(
 					actionIndex,
 					draft.context.module!,
 					actionResult.value
@@ -478,7 +479,7 @@ export class ParserManager<
 
 			this.phase = "actionFlags";
 
-			const actionFlags = ParsingHelpers.parseFlagsPhase(
+			const actionFlags = await this._ctx.helpers.parser.parseFlagsPhase(
 				this.tokens,
 				this.cursor,
 				actionFlagIndex,
@@ -489,8 +490,6 @@ export class ParserManager<
 			this.stop = actionFlags.stopParsing;
 
 			draft.context.actionOptions = actionFlags.values;
-
-			draft.issues.push(...actionFlags.issues);
 
 			if (this.stop) {
 				this.phase = "args";
@@ -504,7 +503,11 @@ export class ParserManager<
 		// -------------------------------------------------
 
 		this.phase = "args";
-		this._setResolved(this._ctx.helpers.core.deepClone(draft));
+
+		this._setResolved(
+			this._ctx.helpers.core.deepClone(draft)
+		);
+
 		this._finalizeArgs();
 	}
 
@@ -523,7 +526,7 @@ export class ParserManager<
 	 */
 	private _finalizeArgs() {
 
-		const argsResult = ParsingHelpers.collectArgsPhase(
+		const argsResult = this._ctx.helpers.parser.collectArgsPhase(
 			this.tokens,
 			this.cursor
 		);
@@ -548,17 +551,6 @@ export class ParserManager<
 	 */
 	public getContext(): RuntimeCliContext {
 		return this.getResolved().context;
-	}
-
-	/**
-	 * Get parsing issues.
-	 *
-	 * Issues are non-fatal and collected during parsing.
-	 *
-	 * @returns ParserIssue[]
-	 */
-	public getIssues(): ParserIssue[] {
-		return this.getResolved().issues;
 	}
 
 	/**

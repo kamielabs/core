@@ -193,85 +193,86 @@ Si l’introduction d’un nouveau CoreError semble nécessaire :
 
 ## Events Names — Règles
 
-* Tous les events (y compris les CoreError) doivent commencer par `CORE_`
-* Le namespace `^CORE_.*$` est réservé exclusivement au core
+* Tous les events (y compris les CoreError) doivent commencer par `core.`
+* Le namespace `^core\..*$` est réservé exclusivement au core
 * Chaque event doit suivre un pattern déterministe et cohérent
 * Le naming suit une logique formelle et non linguistique.
   * L’ordre est toujours :
-    STATE → DETAIL
+    state → detail
     Ex:
-    * DUPLICATE_KEY
-    * MISSING_FILE
-    * NOT_FOUND_MODULE
+    * duplicate.key
+    * missing.file
+    * not.found.module
 
 ---
 
 ### Format
 
 ```text
-CORE_<CONTEXT>_<STATE>[_DETAIL]
+core.<context>.<state>[.detail]
 ```
 
 ---
 
 ### Définitions
 
-* **CONTEXT** : composant ou phase du runtime où se produit l’événement
-  (BOOTSTRAP, STAGE, I18N, PARSER, GLOBALS, MODULES, RUNTIME…)
+* **context** : composant ou phase du runtime où se produit l’événement
+  (bootstrap, stage, i18n, parser, globals, modules, runtime…)
 
-* **STATE** : état ou action décrivant ce qui se produit
-  (INIT, READY, MISSING, NOT_FOUND, INVALID, DUPLICATE…)
+* **state** : état ou action décrivant ce qui se produit
+  (init, ready, missing, not_found, invalid, duplicate…)
 
-* **DETAIL** : précision optionnelle permettant de qualifier plus finement l’événement
-  (FILE, MESSAGE, KEYS…)
+* **detail** : précision optionnelle permettant de qualifier plus finement l’événement
+  (file, message, keys…)
 
 ---
 
 ### Exemples
 
-* `CORE_BOOTSTRAP_INIT`
-* `CORE_BOOTSTRAP_READY`
-* `CORE_STAGE_NOT_FOUND`
-* `CORE_STAGE_FILE_NOT_FOUND`
-* `CORE_I18N_MISSING_MESSAGE`
+* `core.bootstrap.init`
+* `core.bootstrap.ready`
+* `core.stage.not.found`
+* `core.stage.file.not.found`
+* `core.i18n.missing.message`
 
 ---
 
 ### Les Contextes (CONTEXT)
 
-* **CLI** : cœur de la CLI (initialisation globale, instance, etc.)
-* **EVENTS** : événements internes au `EventsManager` (validation, merge, etc.)
-* **BOOTSTRAP** : phase d’initialisation du core
-* **STAGES**/**STAGE** : gestion des stages et gestion de la résolution d'un stage
-* **I18N** : gestion des traductions internes
-* **PARSER** : parsing de la CLI (`ParserManager`)
-* **GLOBALS** : résolution des variables globales
-* **MODULES** : gestion des modules et actions
-* **PLUGINS** : intégration des plugins
-* **ENGINE** : orchestration via les engines
-* **RUNTIME** : gestion globale du lifecycle via `RuntimeService`
-* **UNKNOWN** : Cas non reconnu ou non géré par le système
+* **cli** : cœur de la CLI (initialisation globale, instance, etc.)
+* **events** : événements internes au `EventsManager` (validation, merge, etc.)
+* **bootstrap** : phase d’initialisation du core
+* **stages**/**stage** : gestion des stages et gestion de la résolution d'un stage
+* **i18n** : gestion des traductions internes
+* **parser** : parsing de la CLI (`ParserManager`)
+* **globals** : résolution des variables globales
+* **modules/module/action** : gestion des modules et actions
+* **plugins** : intégration des plugins
+* **engine** . orchestration via les engines
+* **runtime** : gestion globale du lifecycle via `RuntimeService`
+* **unknown** : Cas non reconnu ou non géré par le système
 
 ---
 
 ### Les États (STATE)
 
-> Si un état est suivi de `_<DETAILS>`, alors les détails sont obligatoires.
+> Si un état est suivi de `_<details>`, alors les détails sont obligatoires.
 
-* **`INIT`** Début d’une phase ou initialisation d’un composant
-* **`ALREADY_<DETAILS>`** Tentative de réexécution d’un état déjà atteint
-* **`READY`** Fin réussie d’une phase ou d’un composant correctement initialisé
-* **`HOOKING`** Exécution de hook d'une phase
-* **`FALLBACK_USED`** Utilsation d'un fallback pour un composant donné
-* **`CONFLICT_<DETAILS>`** Élément en conflit avec une autre élément de la config ( ex: ENV STAGE VAR  = ENV GLOBAL VAR )
-* **`MISSING_<DETAILS>`** Élément obligatoire absent (déclaration incomplète ou élément introuvable)
-* **`UNEXPECTED_<DETAILS>`** Élément valide mais non attendu dans ce contexte
-* **`DUPLICATE_<DETAILS>`** Collision dans une structure à clés uniques
-* **`INVALID_<DETAILS>`** État global incohérent ou configuration invalide
-* **`UNKNOWN_<DETAILS>`** Erreur ou objet/configuration impossible à classer (`_<DETAILS>` est optionnel)
-* **`RESERVED_<DETAILS>`** Utilisation d’un espace réservé du core
-* **`ERROR_<DETAILS>`** Erreur non classifiée entraînant une interruption du flow (`_<DETAILS>` est optionnel)
-* **`FATAL_<DETAILS>`** Erreur critique non classifiée entraînant une interruption du flow (`_<DETAILS>` est optionnel)
+* **`init`** Début d’une phase ou initialisation d’un composant
+* **`already.<details>`** Tentative de réexécution d’un état déjà atteint
+* **`ready`** Fin réussie d’une phase ou d’un composant correctement initialisé
+* **`hooking`** Exécution de hook d'une phase
+* **`fallback.used`** Utilsation d'un fallback pour un composant donné
+* **`conflict.<details>`** Élément en conflit avec une autre élément de la config ( ex: ENV STAGE VAR  = ENV GLOBAL VAR )
+* **`missing.<details>`** Élément obligatoire absent (déclaration incomplète ou élément introuvable)
+* **`unexpected.<details>`** Élément valide mais non attendu dans ce contexte
+* **`duplicate.<details>`** Collision dans une structure à clés uniques
+* **`invalid.<details>`** État global incohérent ou configuration invalide
+* **`unknown.<details>`** Erreur ou objet/configuration impossible à classer (`_<DETAILS>` est optionnel)
+* **`reserved.<details>`** Utilisation d’un espace réservé du core
+* **`error.<details>`** Erreur non classifiée entraînant une interruption du flow (`_<DETAILS>` est optionnel)
+* **`fatal.<details>`** Erreur critique non classifiée entraînant une interruption du flow (`_<DETAILS>` est optionnel)
+* **`usage.<details>`** Erreur pendant le parsing qui affiche une aide d'utilisation contextuelle (`_<DETAILS>` est optionnel)
 
 ---
 
@@ -280,31 +281,32 @@ CORE_<CONTEXT>_<STATE>[_DETAIL]
 > Les DETAILS permettent de préciser le contexte exact de l’erreur ou de l’état.
 > Ils sont utilisés en combinaison avec les états nécessitant une précision.
 
-* **INSTANCE** Utilisé pour les informations autour de l'instance CLI
-* **PHASE** Utilisé pour les erreurs de phase de parsing
-* **ENV** Utilisé pour les ENV VAR dans 'stages' ou 'globals'
-* **FILE** Utilisé pour les ressources fichiers (NOT_FOUND_FILE, MISSING_FILE)
-* **PROP** Utilisé pour les properties
-* **KEY / KEYS** Utilisé pour les clés de dictionnaire (DUPLICATE_KEY, MISSING_KEYS)
-* **BUILTIN_MESSAGE** Utilisé pour signaler qu'un message builtin est absent (cela ne doit jamais arriver en v stable)
-* **NAMESPACE** Utilisé pour les conflits d’espace de nom (RESERVED_NAMESPACE)
-* **DRAFT / RESOLVED** Utilisé pour les états internes de résolution des données
-* **RUNNER** Utilisé pour la résolution du runner dans le core
-* **FLAG / FLAG_VALUE / FLAG_IN_SCOPE** Utilisé pour le parsing CLI :
-  * FLAG : flag inconnu ou invalide
-  * FLAG_VALUE : valeur manquante ou incorrecte
-  * FLAG_IN_SCOPE : conflit dans un scope donné
-* **SHORT_GROUP** Utilisé pour les erreurs liées aux groupes de flags courts
-* **MODULE / ACTION** Utilisé pour les erreurs liées aux modules et actions
-* **ACTION_HOOK** Utilisé pour les état liés à l'action
-* **TRANSITION** Utilisé par le runtime service pour indiquer des erreurs de transition de phase du runtime
+* **instance** Utilisé pour les informations autour de l'instance CLI
+* **phase** Utilisé pour les erreurs de phase de parsing
+* **env** Utilisé pour les ENV VAR dans 'stages' ou 'globals'
+* **file** Utilisé pour les ressources fichiers (NOT_FOUND_FILE, MISSING_FILE)
+* **prop** Utilisé pour les properties
+* **key / keys** Utilisé pour les clés de dictionnaire (DUPLICATE_KEY, MISSING_KEYS)
+* **builtin.message** Utilisé pour signaler qu'un message builtin est absent (cela ne doit jamais arriver en v stable)
+* **namespace** Utilisé pour les conflits d’espace de nom (RESERVED_NAMESPACE)
+* **draft / resolved** Utilisé pour les états internes de résolution des données
+* **runner** Utilisé pour la résolution du runner dans le core
+* **flag / flag.value / flag.in.scope** Utilisé pour le parsing CLI:
+  * flag : flag inconnu ou invalide
+  * flag.value : valeur manquante ou incorrecte
+  * flag.in.scope : conflit dans un scope donné
+* **short.group** Utilisé pour les erreurs liées aux groupes de flags courts
+* **module / action** Utilisé pour les states liées aux modules et actions
+* **action.hook** Utilisé pour les état liés à l'action
+* **transition** Utilisé par le runtime service pour indiquer des erreurs de transition de phase du runtime
+* **module.help** Utilisé pour les erreurs liées aux arguments du module builtin help
 
 ---
 
 ### Notes
 
 * Le naming doit rester **strictement cohérent** dans tout le core
-* Aucun synonyme ne doit être introduit (ex : `SUCCESS` ≠ `READY`)
+* Aucun synonyme ne doit être introduit (ex : `success` ≠ `ready`)
 * Les règles définies ici constituent un **contrat stable** du système
 
 ---
@@ -332,8 +334,8 @@ camelCase
 ### Règles
 
 * Les clés doivent être écrites en **camelCase**
-* Elles ne doivent **pas** contenir de `_`
-* Elles ne doivent **pas** contenir le préfixe `CORE_`
+* Elles ne doivent **pas** contenir de `.`
+* Elles ne doivent **pas** contenir le préfixe `core.`
 * Elles doivent représenter la même information que le nom de l’event, sans le namespace
 
 ---
@@ -346,11 +348,11 @@ Chaque clé doit être une **projection directe** du nom d’event associé.
 
 | Key                | Event Name                |
 | ------------------ | ------------------------- |
-| bootstrapInit      | CORE_BOOTSTRAP_INIT       |
-| bootstrapReady     | CORE_BOOTSTRAP_READY      |
-| stageNotFound      | CORE_STAGE_NOT_FOUND      |
-| stageFileNotFound  | CORE_STAGE_FILE_NOT_FOUND |
-| i18nMissingMessage | CORE_I18N_MISSING_MESSAGE |
+| bootstrapInit      | core.bootstrap.init       |
+| bootstrapReady     | core.bootstrap.ready      |
+| stageNotFound      | core.stage.not.found      |
+| stageFileNotFound  | core.stage.file.not.found |
+| i18nMissingMessage | core.i18n.missing.message |
 
 ---
 
@@ -393,21 +395,21 @@ Elles constituent un **alias ergonomique** du nom d’event complet.
 
 | key | name | code | source | desc | status |
 |-----|------|------|--------|------|--------|
-| cliInstanceDuplicate | CORE_CLI_DUPLICATE_INSTANCE | F00001 | CLI.init | CLI is already init! | LOCKED |
-| eventReservedNamespace | CORE_EVENT_RESERVED_NAMESPACE | F00100 | Builders.buildEvents | `Event "${key}" cannot use reserved namespace 'CORE_'` | LOCKED |
-| eventDuplicateKey | CORE_EVENT_DUPLICATE_KEY | F00101 | Builders.buildEvents | `Event key "${key}" already exists` | LOCKED |
-| eventDuplicateName | CORE_EVENT_DUPLICATE_NAME | F00102 | Builders.buildEvents | `Event name "${name}" already exists` | LOCKED |
-| stageDuplicateFile | CORE_STAGE_DUPLICATE_FILE | F00300 | Builders.buildStages | Stage "${stageName}" cannot override builtin "file" | OK |
-| stageDuplicateProp | CORE_STAGE_DUPLICATE_PROP | F00301 | Builders.buildStages | Stage "${stageName}" prop "${propName}" already exists in builtin props | OK |
-| stageMissingFile | CORE_STAGE_MISSING_FILE | F00302 | Builders.buildStages | Custom stage "${stageName}" must declare a "file" | OK |
-| stageMissingLang | CORE_STAGE_MISSING_LANG | F00303 | Builders.buildStages | Custom stage "${stageName}" must declare a "lang" | OK |
-| i18nNameSpace | CORE_I18N_RESERVED_NAMESPACE | F00400 | Builders.buildTranslations | `Custom translation "${key}" cannot use reserved namespace 'CORE_'` | OK |
-| i18nDuplicateMessage | CORE_I18N_DUPLICATE_MESSAGE | F00401 | Builders.buildTranslations | Translation key "${key}" already exists in builtin lang "${lang}" | OK |
-| i18nInvalidKey | CORE_I18N_INVALID_KEY | F00402 | Builders.buildTranslations | `Builtin translation "${key}" does not match runtime name "${msg.name}"` | OK |
+| cliInstanceDuplicate | core.cli.duplicate.instance | F00001 | CLI.init | CLI is already init! | LOCKED |
+| eventReservedNamespace | core.event.reserved.namespace | F00100 | Builders.buildEvents | `Event "${key}" cannot use reserved namespace 'CORE.'` | LOCKED |
+| eventDuplicateKey | core.event.duplicate.key | F00101 | Builders.buildEvents | `Event key "${key}" already exists` | LOCKED |
+| eventDuplicateName | core.event.duplicate.name | F00102 | Builders.buildEvents | `Event name "${name}" already exists` | LOCKED |
+| stageDuplicateFile | core.stage.duplicate.file | F00300 | Builders.buildStages | Stage "${stageName}" cannot override builtin "file" | OK |
+| stageDuplicateProp | core.stage.duplicate.prop | F00301 | Builders.buildStages | Stage "${stageName}" prop "${propName}" already exists in builtin props | OK |
+| stageMissingFile | core.stage.missing.file | F00302 | Builders.buildStages | Custom stage "${stageName}" must declare a "file" | OK |
+| stageMissingLang | core.stage.missing.lang | F00303 | Builders.buildStages | Custom stage "${stageName}" must declare a "lang" | OK |
+| i18nNameSpace | core.i18n.reserved.namespace | F00400 | Builders.buildTranslations | `Custom translation "${key}" cannot use reserved namespace 'CORE.'` | OK |
+| i18nDuplicateMessage | core.i18n.duplicate.message | F00401 | Builders.buildTranslations | Translation key "${key}" already exists in builtin lang "${lang}" | OK |
+| i18nInvalidKey | core.i18n.invalid.key | F00402 | Builders.buildTranslations | `Builtin translation "${key}" does not match runtime name "${msg.name}"` | OK |
 |                |                       |        |                            |  `Custom translation "${key}" does not match runtime name "${msg.name}"`|    |
-| globalsNamespace | CORE_GLOBALS_RESERVED_NAMESPACE | F00600 | Builders.buildGlobals | "core" namespace is reserved and cannot be defined in custom globals | OK |
-| modulesNamespace | CORE_MODULES_RESERVED_NAMESPACE | F00700 | Builders.buildModules | Module "${key}" is reserved and cannot be overridden | OK |
-| unknownError | CORE_UNKNOWN_ERROR | F99999 | unknown | Fallback unknown core error | LOCKED |
+| globalsNamespace | core.globals.reserved.namespace | F00600 | Builders.buildGlobals | "core" namespace is reserved and cannot be defined in custom globals | OK |
+| modulesNamespace | core.modules.reserved.namespace | F00700 | Builders.buildModules | Module "${key}" is reserved and cannot be overridden | OK |
+| unknownError | core.unknown.error | F99999 | unknown | Fallback unknown core error | LOCKED |
 
 * *CoreError (non-locked)*
 → will become Events in a future architecture (no-merge model)
@@ -418,135 +420,81 @@ Elles constituent un **alias ergonomique** du nom d’event complet.
 
 | key | name(old code) | code | level | kind | phase | source | trigger | details/values | status |
 |-----|----------------|------|------|-------|-------|--------|---------|----------------|--------|
-|bootstrapAlreadyResolved|CORE_BOOTSTRAP_ALREADY_RESOLVED|F?????|fatal|signal|bootstrap|BootstrapManager.setResolved|false|none|OK|
-|bootstrapMissingResolved|CORE_BOOTSTRAP_MISSING_RESOLVED|F?????|fatal|signal|bootstrap|BootstrapManager.getResolved|false|none|OK|
-|stagesMissingDraft|CORE_STAGES_MISSING_DRAFT|F?????|fatal|signal|stage|StagesManager.getDraft|false|none|OK|
-|stagesAlreadyResolved|CORE_STAGES_ALREADY_RESOLVED|F?????|fatal|signal|stage|StagesManager.setResolved|false|none|OK|
-|stagesMissingResolved|CORE_STAGES_MISSING_RESOLVED|F?????|fatal|signal|stage|StagesManager.getResolved|false|none|OK|
-|stageDuplicateEnv|CORE_STAGE_DUPLICATE_ENV|F?????|fatal|signal|stage|StagesManager._resolveIndexes|false|details: `[ Env Key: ${envKey}, Stage: ${existing.stageName}, Option: ${existing.optionName}  ]`|OK|
-|stageMissing|CORE_STAGE_MISSING|F?????|fatal|signal|stage|StagesManager.resolve|false|details: `[Name: ${stage}]`|OK|
-|stageMissingFile|CORE_STAGE_MISSING_FILE|F?????|fatal|signal|stage|StagesManager.resolve|false|details: `[StageFile: ${file}]`|OK|
-|stageMissingLang|CORE_STAGE_MISSING_LANG|F?????|fatal|signal|stage|StagesManager._coreStageHook|false|details: `[Lang: ${lang}]`|OK|
-|stageMissingWorkingDir|CORE_STAGE_MISSING_WORKING_DIR|F?????|fatal|signal|stage|StagesManager._coreStageHook|false|details: `[Path: ${workingDir}]`|OK|
-|stageHooking|CORE_STAGE_HOOKING|T?????|trace|signal|stage|StagesManager.resolve|false|none|OK|
-|i18nAlreadyResolved|CORE_I18N_ALREADY_RESOLVED|F?????|fatal|signal|i18n|I18nManager.setResolved|false|none|OK|
-|i18nMissingResolved|CORE_I18N_MISSING_RESOLVED|F?????|fatal|signal|i18n|I18nManager.getResolved|false|none|OK|
-|i18nMissingLang|CORE_I18N_MISSING_LANG|F?????|fatal|signal|i18n|I18nManager.resolve|false|details: `['en' builtins mandatory]`|OK|
-|i18nUnknownKeys|CORE_I18N_UNKNOWN_KEYS|F?????|fatal|signal|i18n|I18nManager.resolve|false|details: `[lang: unknown_keys]`|OK|
-|i18nMissingKeys|CORE_I18N_MISSING_KEYS|W?????|warning|signal|i18n|I18nManager.resolve|false|details: `[lang: missing_keys]`|OK|
-|i18nMissingBuiltinMessage|CORE_I18N_MISSING_BUILTIN_MESSAGE|F?????|fatal|signal|i18n|I18nManager.tr|false|details: `[missing_message: keys]`|OK|
-|i18nMissingMessageValues|CORE_I18N_MISSING_MESSAGE_VALUES|W?????|warning|signal|i18n|I18nManager.tr|false|details: `[message: values]`|OK|
-|i18nFallbackUsed|CORE_I18N_FALLBACK_USED|W?????|warning|signal|i18n|I18nManager.tr|false|none|OK|
-|parserMissingDraft|CORE_PARSER_MISSING_DRAFT|F?????|fatal|signal|parser|ParserManager.getDraft|false|none|OK|
-|parserMissingResolved|CORE_PARSER_MISSING_RESOLVED|F?????|fatal|signal|parser|ParserManager.getResolved|false|none|OK|
-|parserInvalidPhase|CORE_PARSER_INVALID_PHASE|F?????|fatal|message|parser|resolveGlobals/resolveModule/finalizeArgsPhase/finalize|false|values: { currentPhase: string, neededPhase: string, method: string }|OK|
-|globalsMissingDraft|CORE_GLOBALS_MISSING_DRAFT|F?????|fatal|signal|globals|GlobalsManager.getDraft|false|none|OK|
-|globalsAlreadyResolved|CORE_GLOBALS_ALREADY_RESOLVED|F?????|fatal|signal|globals|GlobalsManager.setResolved|false|none|OK|
-|globalsMissingResolved|CORE_GLOBALS_MISSING_RESOLVED|F?????|fatal|signal|globals|GlobalsManager.getResolved|false|none|OK|
-|globalsDuplicateEnv|CORE_GLOBALS_DUPLICATE_ENV|F?????|fatal|signal|globals|GlobalsManager._resolveIndexes|false|details: `[opt.env]`|OK|
-|globalsConflictEnv|CORE_GLOBALS_CONFLICT_ENV|F?????|fatal|signal|globals|GlobalsManager._resolveIndexes|false|details: `[ ${env}, stage: ${runtimeStage} ]` |OK|
-|globalsDuplicateFlag|CORE_GLOBALS_DUPLICATE_FLAG|F?????|fatal|signal|globals|GlobalsManager._resolveIndexes|false|details: `[${flag}]`|OK|
-|globalsHooking|CORE_GLOBALS_HOOKING|T?????|trace|message|globals|GlobalsManager.resolve|false|none|OK|
-|modulesMissingDraft|CORE_MODULES_MISSING_DRAFT|F?????|fatal|signal|modules|ModulesManager.getDraft|false|none|OK|
-|modulesAlreadyResolved|CORE_MODULES_ALREADY_RESOLVED|F?????|fatal|signal|modules|ModulesManager.setResolved|false|none|OK|
-|modulesMissingResolved|CORE_MODULES_MISSING_RESOLVED|F?????|fatal|signal|modules|ModulesManager.getResolved|false|none|OK|
-|modulesConflictModule|CORE_MODULES_CONFLICT_MODULE|F?????|fatal|signal|modules|ModulesManager._resolveIndexes|false|none|OK|
-|modulesConflictAction|CORE_MODULES_CONFLICT_ACTION|F?????|fatal|signal|modules|ModulesManager._resolveIndexes|false|none|OK|
-|modulesHooking|CORE_MODULES_HOOKING|T?????|trace|message|modules|ModulesManager.resolve|false|none|OK|
-|modulesMissingActionHook|CORE_MODULES_MISSING_ACTION_HOOK|F?????|fatal|message|modules|ModulesManager.runner|false|values: { module:string, action:string }|OK|
-|runtimeMissingDraft|CORE_RUNTIME_MISSING_DRAFT|F?????|fatal|signal|runtime|RuntimeService.getDraft|false|none|OK|
-|runtimeAlreadyResolved|CORE_RUNTIME_ALREADY_RESOLVED|F?????|fatal|signal|runtime|RuntimeService.setResolved|false|none|OK|
-|runtimeMissingResolved|CORE_RUNTIME_MISSING_RESOLVED|F?????|fatal|signal|runtime|RuntimeService.getResolved|false|none|OK|
-|runtimeInvalidTransition|CORE_RUNTIME_INVALID_TRANSITION|F?????|fatal|signal|runtime|RuntimeService._setState|false|none|OK|
-|runtimeInit|CORE_RUNTIME_INIT|T?????|trace|signal|runtime|RuntimeService.setInit|true|none|OK|
-|bootstrapInit|CORE_BOOTSTRAP_INIT|T?????|trace|signal|bootstrap|RuntimeService.setBootstrap|false|none|OK|
-|bootstrapReady|CORE_BOOTSTRAP_READY|T?????|trace|signal|bootstrap|RuntimeService.setBootstrap|true|none|OK|
-|stageInit|CORE_STAGE_INIT|T?????|trace|signal|stage|RuntimeService.setStage|false|none|OK|
-|i18nInit|CORE_I18N_INIT|T?????|trace|signal|i18n|RuntimeService.setStage|false|none|OK|
-|i18nReady|CORE_I18N_READY|T?????|trace|signal|i18n|RuntimeService.setStage|false|none|OK|
-|parserInit|CORE_PARSER_INIT|T?????|trace|message|parser|RuntimeService.setStage|false|none|OK|
-|parserReady|CORE_PARSER_READY|T?????|trace|message|parser|RuntimeService.setReady|false|none|OK|
-|stageReady|CORE_STAGE_READY|T?????|trace|message|stage|RuntimeService.setStage|true|none|OK|
-|globalsInit|CORE_GLOBALS_INIT|T?????|trace|message|globals|RuntimeService.setGlobals|false|none|OK|
-|globalsReady|CORE_GLOBALS_READY|T?????|trace|message|globals|RuntimeService.setGlobals|true|none|OK|
-|modulesInit|CORE_MODULES_INIT|T?????|trace|message|modules|RuntimeService.setModules|false|none|OK|
-|modulesReady|CORE_MODULES_READY|T?????|trace|message|modules|RuntimeService.setModules|true|none|OK|
-|runtimeReady|CORE_RUNTIME_READY|T?????|trace|message|runtime|RuntimeService.setReady|true|none|OK|
-|runtimeMissingEvent|CORE_RUNTIME_MISSING_EVENT|E?????|error|signal|runtime|EventsManager._emit|false|details: `["code"]`|OK|
-|engineUnknown|CORE_ENGINE_UNKNOWN|F?????|fatal|signal|runtime|CoreEngine.getEngine|false|none|OK|
-|engineUnknownRunner|CORE_ENGINE_UNKNOWN_RUNNER|F?????|fatal|signal|runtime|CoreEngine.getRunner|false|none|OK|
-
----
-
-## tous les détails et informations des Events
-
-* **`Les Parser Warnings seront rework dans un second temps`**
-
-* ts/lib/helpers/ParsingHelpers.ts:
-
-  * **les erreurs de parsing actuelles utilisent un système interne qui stocke les erreurs dans un dict renvoyé au runner**
-
-  * nous listons tous les parsing issues ici pour future update vers eventMessage ->
-
-  ```ts
-  export interface ParserIssue {
-   code:
-   | "UNKNOWN_FLAG"
-   | "MISSING_FLAG_VALUE"
-   | "UNEXPECTED_FLAG_VALUE"
-   | "DUPLICATE_FLAG_IN_SCOPE"
-   | "INVALID_SHORT_GROUP"
-   | "MODULE_MISSING"
-   | "ACTION_MISSING";
-   message: string;
-   token?: string;
-  }
-  ```
-
-|nom|source|desc|token|status|type|
-|---|---|---|---|---|---|
-|UNKNOWN_FLAG|parseLongFlagToken|`Unknown flag "${rawKey}" in current scope`|true|KO: ParserIssue to convert|message|
-|MISSING_FLAG_VALUE|parseLongFlagToken|`Flag "${rawKey}" requires a value`|true|KO: ParserIssue to convert|message|
-|UNEXPECTED_FLAG_VALUE|parseLongFlagToken|`Flag "${rawKey}" does not accept a user value`|true|KO: ParserIssue to convert|message|
-|UNKNOWN_FLAG|parseShortFlagToken|`Invalid short flag token "${token}"`|true|KO: ParserIssue to convert|message|
-|UNKNOWN_FLAG|parseShortFlagToken|`Unknown flag "${rawKey}" in current scope`|true|KO: ParserIssue to convert|message|
-|UNEXPECTED_FLAG_VALUE|parseShortFlagToken|`Flag "${rawKey}" does not accept a user value`|true|KO: ParserIssue to convert|message|
-|UNKNOWN_FLAG|parseShortFlagToken|`Unknown flag "${rawKey}" in current scope`|true|KO: ParserIssue to convert|message|
-|MISSING_FLAG_VALUE|parseShortFlagToken|`Flag "${rawKey}" requires a value`|true|KO: ParserIssue to convert|message|
-|UNKNOWN_FLAG|parseShortFlagToken|`Unknown flag "${rawKey}" in current scope`|true|KO: ParserIssue to convert|message|
-|INVALID_SHORT_GROUP|parseShortFlagToken|`Flag "${rawKey}" requires a value and cannot appear before the end of a short group`|true|KO: ParserIssue to convert|message|
-|MISSING_FLAG_VALUE|parseShortFlagToken|`Flag "${rawKey}" requires a value`|true|KO: ParserIssue to convert|message|
-|UNEXPECTED_FLAG_VALUE|parseShortFlagToken|`Flag "${rawKey}" does not accept a user value`|true|KO: ParserIssue to convert|message|
-|DUPLICATE_FLAG_IN_SCOPE|applyFlag|`Duplicate flag for option "${optionName}" in current scope`|true|KO: ParserIssue to convert|message|
-|MODULE_MISSING_NOTOKEN|parseKeywordPhase|"Module is missing" |false|KO: ParserIssue to convert|message|
-|ACTION_MISSING_NOTOKEN|parseKeywordPhase|"Action is missing" |false|KO: ParserIssue to convert|message|
-|MODULE_MISSING|parseKeywordPhase|"Module is missing" |true|KO: ParserIssue to convert|message|
-|ACTION_MISSING|parseKeywordPhase|"Action is missing" |true|KO: ParserIssue to convert|message|
-|UNKNOWN_MODULE|parseKeywordPhase|"Unknown module" |true|KO: ParserIssue to convert|message|
-|UNKNOWN_ACTION|parseKeywordPhase|"Unknown action" |true|KO: ParserIssue to convert|message|
-
-une parserIssue est build de cette manière aujourd'hui  :
-
-```ts
- public static buildIssue(
-  code: ParserIssue["code"],
-  message: string,
-  token?: string
- ): ParserIssue {
-  if (token) return { code, message, token }
-  else return { code, message };
- };
-
-```
-
-les issues sont stockées dans le ParserManager sous cette forme :
-
-```ts
-private result: ParsedCliContextResult = {
-  context: {},
-  ignored: [],
-  issues: []
- };
-```
+|bootstrapAlreadyResolved|core.bootstrap.already.resolved|F?????|fatal|signal|bootstrap|BootstrapManager.setResolved|false|none|OK|
+|bootstrapMissingResolved|core.bootstrap.missing.resolved|F?????|fatal|signal|bootstrap|BootstrapManager.getResolved|false|none|OK|
+|stagesMissingDraft|core.stages.missing.draft|F?????|fatal|signal|stage|StagesManager.getDraft|false|none|OK|
+|stagesAlreadyResolved|core.stages.already.resolved|F?????|fatal|signal|stage|StagesManager.setResolved|false|none|OK|
+|stagesMissingResolved|core.stages.missing.resolved|F?????|fatal|signal|stage|StagesManager.getResolved|false|none|OK|
+|stageDuplicateEnv|core.stage.duplicate.env|F?????|fatal|signal|stage|StagesManager._resolveIndexes|false|details: `[ Env Key: ${envKey}, Stage: ${existing.stageName}, Option: ${existing.optionName}  ]`|OK|
+|stageMissing|core.stage.missing|F?????|fatal|signal|stage|StagesManager.resolve|false|details: `[Name: ${stage}]`|OK|
+|stageMissingFile|core.stage.missing.file|F?????|fatal|signal|stage|StagesManager.resolve|false|details: `[StageFile: ${file}]`|OK|
+|stageMissingLang|core.stage.missing.lang|F?????|fatal|signal|stage|stagesmanager._coreStageHook|false|details: `[Lang: ${lang}]`|OK|
+|stageMissingWorkingDir|core.stage.missing.working.dir|F?????|fatal|signal|stage|StagesManager._coreStageHook|false|details: `[Path: ${workingDir}]`|OK|
+|stageHooking|core.stage.hooking|T?????|trace|signal|stage|StagesManager.resolve|false|none|OK|
+|i18nAlreadyResolved|core.i18n.already.resolved|F?????|fatal|signal|i18n|I18nManager.setResolved|false|none|OK|
+|i18nMissingResolved|core.i18n.missing.resolved|F?????|fatal|signal|i18n|I18nManager.getResolved|false|none|OK|
+|i18nMissingLang|core.i18n.missing.lang|F?????|fatal|signal|i18n|I18nManager.resolve|false|details: `['en' builtins mandatory]`|OK|
+|i18nUnknownKeys|core.i18n.unknown.keys|F?????|fatal|signal|i18n|I18nManager.resolve|false|details: `[lang: unknown.keys]`|OK|
+|i18nMissingKeys|core.i18n.missing.keys|W?????|warning|signal|i18n|I18nManager.resolve|false|details: `[lang: missing.keys]`|OK|
+|i18nMissingBuiltinMessage|core.i18n.missing.builtin.message|F?????|fatal|signal|i18n|I18nManager.tr|false|details: `[missing.message: keys]`|OK|
+|i18nMissingMessageValues|core.i18n.missing.message.values|W?????|warning|signal|i18n|I18nManager.tr|false|details: `[message: values]`|OK|
+|i18nFallbackUsed|core.i18n.fallback.used|W?????|warning|signal|i18n|I18nManager.tr|false|none|OK|
+|parserMissingDraft|core.parser.missing.draft|F?????|fatal|signal|parser|ParserManager.getDraft|false|none|OK|
+|parserMissingResolved|core.parser.missing.resolved|F?????|fatal|signal|parser|ParserManager.getResolved|false|none|OK|
+|parserInvalidPhase|core.parser.invalid.phase|F?????|fatal|message|parser|resolveGlobals/resolveModule/finalizeArgsPhase/finalize|false|values: { currentPhase: string, neededPhase: string, method: string }|OK|
+|globalsMissingDraft|core.globals.missing.draft|F?????|fatal|signal|globals|GlobalsManager.getDraft|false|none|OK|
+|globalsAlreadyResolved|core.globals.already.resolved|F?????|fatal|signal|globals|GlobalsManager.setResolved|false|none|OK|
+|globalsMissingResolved|core.globals.missing.resolved|F?????|fatal|signal|globals|GlobalsManager.getResolved|false|none|OK|
+|globalsDuplicateEnv|core.globals.duplicate.env|F?????|fatal|signal|globals|GlobalsManager._resolveIndexes|false|details: `[opt.env]`|OK|
+|globalsConflictEnv|core.globals.conflict.env|F?????|fatal|signal|globals|GlobalsManager._resolveIndexes|false|details: `[ ${env}, stage: ${runtimeStage} ]` |OK|
+|globalsDuplicateFlag|core.globals.duplicate.flag|F?????|fatal|signal|globals|GlobalsManager._resolveIndexes|false|details: `[${flag}]`|OK|
+|globalsHooking|core.globals.hooking|T?????|trace|message|globals|GlobalsManager.resolve|false|none|OK|
+|modulesMissingDraft|core.modules.missing.draft|F?????|fatal|signal|modules|ModulesManager.getDraft|false|none|OK|
+|moduleDuplicateFlag|core.module.duplicate.flag|F?????|fatal|signal|modules|ModulessManager._resolveIndexes|false|details: `["module: ${module}", "flag: ${flag}"]`|OK|
+|actionDuplicateFlag|core.action.duplicate.flag|F?????|fatal|signal|modules|ModulessManager._resolveIndexes|false|details: `["module: ${module}", "action: ${action}", "flag: ${flag}"]`|OK|
+|modulesAlreadyResolved|core.modules.already.resolved|F?????|fatal|signal|modules|ModulesManager.setResolved|false|none|OK|
+|modulesMissingResolved|core.modules.missing.resolved|F?????|fatal|signal|modules|ModulesManager.getResolved|false|none|OK|
+|modulesConflictModule|core.modules.conflict.module|F?????|fatal|signal|modules|ModulesManager._resolveIndexes|false|none|OK|
+|modulesConflictAction|core.modules.conflict.action|F?????|fatal|signal|modules|ModulesManager._resolveIndexes|false|none|OK|
+|modulesHooking|core.modules.hooking|T?????|trace|message|modules|ModulesManager.resolve|false|none|OK|
+|modulesMissingActionHook|core.modules.missing.action.hook|F?????|fatal|message|modules|ModulesManager.runner|false|values: { module:string, action:string }|OK|
+|runtimeMissingDraft|core.runtime.missing.draft|F?????|fatal|signal|runtime|RuntimeService.getDraft|false|none|OK|
+|runtimeAlreadyResolved|core.runtime.already.resolved|F?????|fatal|signal|runtime|RuntimeService.setResolved|false|none|OK|
+|runtimeMissingResolved|core.runtime.missing.resolved|F?????|fatal|signal|runtime|RuntimeService.getResolved|false|none|OK|
+|runtimeInvalidTransition|core.runtime.invalid.transition|F?????|fatal|signal|runtime|RuntimeService._setState|false|none|OK|
+|runtimeInit|core.runtime.init|T?????|trace|signal|runtime|RuntimeService.setInit|true|none|OK|
+|bootstrapInit|core.bootstrap.init|T?????|trace|signal|bootstrap|RuntimeService.setBootstrap|false|none|OK|
+|bootstrapReady|core.bootstrap.ready|T?????|trace|signal|bootstrap|RuntimeService.setBootstrap|true|none|OK|
+|stageInit|core.stage.init|T?????|trace|signal|stage|RuntimeService.setStage|false|none|OK|
+|i18nInit|core.i18n.init|T?????|trace|signal|i18n|RuntimeService.setStage|false|none|OK|
+|i18nReady|core.i18n.ready|T?????|trace|signal|i18n|RuntimeService.setStage|false|none|OK|
+|parserInit|core.parser.init|T?????|trace|message|parser|RuntimeService.setStage|false|none|OK|
+|parserReady|core.parser.ready|T?????|trace|message|parser|RuntimeService.setReady|false|none|OK|
+|stageReady|core.stage.ready|T?????|trace|message|stage|RuntimeService.setStage|true|none|OK|
+|globalsInit|core.globals.init|T?????|trace|message|globals|RuntimeService.setGlobals|false|none|OK|
+|globalsReady|core.globals.ready|T?????|trace|message|globals|RuntimeService.setGlobals|true|none|OK|
+|modulesInit|core.modules.init|T?????|trace|message|modules|RuntimeService.setModules|false|none|OK|
+|modulesReady|core.modules.ready|T?????|trace|message|modules|RuntimeService.setModules|true|none|OK|
+|runtimeReady|core.runtime.ready|T?????|trace|message|runtime|RuntimeService.setReady|true|none|OK|
+|runtimeMissingEvent|core.runtime.missing.event|E?????|error|signal|runtime|EventsManager._emit|false|details: `["code"]`|OK|
+|engineUnknown|core.engine.unknown|F?????|fatal|signal|runtime|CoreEngine.getEngine|false|none|OK|
+|engineUnknownRunner|core.engine.unknown.runner|F?????|fatal|signal|runtime|CoreEngine.getRunner|false|none|OK|
+|parserUnknownGlobalFlag|core.parser.unknown.global.flag|W?????|warning|message|parser|ParserHelpers|false|values: { flag: string }|OK|
+|parserUnknownModuleFlag|core.parser.unknown.module.flag|W?????|warning|message|parser|ParserHelpers|false|values: { flag: string }|OK|
+|parserUnknownActionFlag|core.parser.unknown.action.flag|W?????|warning|message|parser|ParserHelpers|false|values: { flag: string }|OK|
+|parserMissingFlagValue|core.parser.missing.flag.value|W?????|warning|message|parser|ParserHelpers|false|values: { flag: string }|OK|
+|parserUnexpectedFlagValue|core.parser.unexpected.flag.value|W?????|warning|message|parser|ParserHelpers|false|values: { flag: string }|OK|
+|parserInvalidShortGroup|core.parser.invalid.short.group|W?????|warning|message|parser|ParserHelpers|false|values: { flag: string }|OK|
+|parserDuplicatedFlag|core.parser.duplicate.flag|W?????|warning|message|parser|ParserHelpers|false|values: { flag: string, opt: string, scope: string }|OK|
+|parserMissingModule|core.parser.missing.module|W?????|warning|message|parser|ParserHelpers|false|none|OK|
+|parserMissingAction|core.parser.missing.action|W?????|warning|message|parser|ParserHelpers|false| values: { module: string }|OK|
+|parserUnknownModule|core.parser.unknown.module|W?????|warning|message|parser|ParserHelpers|false|values: { module: string }|OK|
+|parserUnknownAction|core.parser.unknown.action|W?????|warning|message|parser|ParserHelpers|false|values: { module: string, action: string }|OK|
+|parserUsage|core.parser.usage|E?????|error|message|parser|ModulesManager.runner|false| values: { helpCli: string } |OK|
+|parserUsageModule|core.parser.usage.module|E?????|error|message|parser|ModulesManager.runner|false|values: { helpCli: string, module: string }|OK|
+|parserUsageAction|core.parser.usage.action|E?????|error|message|parser|ModulesManager.runner|false|values: { helpCli: string, module: string, action: string }|OK|
+|parserUsageGlobalFlag|core.parser.usage.global.flag|E?????|error|message|parser|ModulesManager.runner|false|values: { helpCli: string, flag: string }|OK|
+|parserUsageModuleFlag|core.parser.usage.module.flag|E?????|error|message|parser|ModulesManager.runner|false|values: { helpCli: string, flag: string, module: string }|OK|
+|parserUsageActionFlag|core.parser.usage.action.flag|E?????|error|message|parser|ModulesManager.runner|false|values: { helpCli: string, flag: string, module: string, action: string }|OK|
 
 ---
