@@ -215,8 +215,37 @@ Details:
   Flag: ${testScript} help test test1 <-f/--flag/--alias>
 --------------------------------------------------------------------------------`;
 
-const unknownModuleError = `Unknown Module: unknown`
-const fullHelpUsage = `Full Help: ${testScript} help`
+const unknownGlobalFlagError = `Unknown Global Flag: -u`
+const unknownModuleError = `Unknown Module: unknown`;
+const unknownModuleFlagError = `Unknown Module Flag: -u`
+const unknownActionError = `Unknown Action: unknown in module test`;
+const unknownActionFlagError = `Unknown Action Flag: -u`
+
+
+// Help Module Error routes
+const unknownStageEnvHelpError = `Help Error: Invalid Stage Env "UNKNOWN"`
+const unknownGlobalHelpError = `Help Error: Invalid Global Flag "-u"`;
+const unknownModuleHelpError = `Help Error: Invalid Module Name "unknown"`
+const unknownActionHelpError = `Help Error: Invalid Action Name "unknown" (Module:test)`;
+const unsupportedNamedActionHelpError = `Help Error: Unsupported named action for module "help"`;
+const unknownModuleFlagHelpError = `Help Error: Invalid Module Flag "-u" (Module:test)`;
+const unknownActionFlagHelpError = `Help Error: Invalid Action Flag "-u" (Module/Action:test test1)`;
+
+const fullHelpUsage = `Full Help: ${testScript} help`;
+const globalsHelpUsage = `Help: ${testScript} help -G`
+const modulesHelpUsage = `Help: ${testScript} help -M`
+const moduleHelpUsage = `Help: ${testScript} help test`;
+const actionHelpUsage = `Help: ${testScript} help test test1`;
+
+const stageEnvsHelpList = `List Stage Envs -> ${testScript} help -S`
+const globalsHelpList = `List Global Flags -> $ ${testScript} help -G`;
+const modulesHelpList = `List Modules -> $ ${testScript} help -M`;
+
+const moduleFlagsHelpList = `List Module Flags -> $ ${testScript} help test`;
+const actionFlagsHelpList = `List Action Flags -> $ ${testScript} help test test1`;
+
+const moduleHelpList = `Module Help -> ${testScript} help help`;
+const moduleActionsHelpList = `List Module Actions -> $ ${testScript} help test`
 
 export const outputs = {
 	normalHelp,
@@ -231,6 +260,35 @@ export const outputs = {
 	moduleDefaultActionFlagHelp,
 	moduleHelp,
 	moduleActionHelp,
+
+
+	unknownGlobalFlagError,
 	unknownModuleError,
-	fullHelpUsage
+	unknownModuleFlagError,
+	unknownActionError,
+	unknownActionFlagError,
+
+
+	unknownStageEnvHelpError,
+	unknownGlobalHelpError,
+	unknownModuleHelpError,
+	unknownActionHelpError,
+	unsupportedNamedActionHelpError,
+	unknownModuleFlagHelpError,
+	unknownActionFlagHelpError,
+
+	fullHelpUsage,
+	globalsHelpUsage,
+	modulesHelpUsage,
+	moduleHelpUsage,
+	actionHelpUsage,
+
+	stageEnvsHelpList,
+	globalsHelpList,
+	modulesHelpList,
+
+	moduleHelpList,
+	moduleActionsHelpList,
+	moduleFlagsHelpList,
+	actionFlagsHelpList
 }

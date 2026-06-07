@@ -25,6 +25,11 @@ export function renderHelpError(helpCli: string, help: HelpRoute) {
 			console.error(`${errPrefix} Invalid Module Flag "${help.flag}" (Module:${help.module})\n${moduleFlagHelp}`);
 			break;;
 		}
+		case 'actionNotSupported': {
+			const defaultModuleHelp = `Module Help -> ${helpCli} ${help.module}`;
+			console.error(`${errPrefix} Unsupported named action for module "${help.module}"\n${defaultModuleHelp}`);
+			break;;
+		}
 		case 'actionNotFound': {
 			const actionHelp = `List Module Actions -> $ ${helpCli} ${help.module}`;
 			console.error(`${errPrefix} Invalid Action Name "${help.action}" (Module:${help.module})\n${actionHelp}`);
@@ -45,4 +50,5 @@ export function renderHelpError(helpCli: string, help: HelpRoute) {
 			break;;
 		}
 	}
+	process.exit(1);
 }

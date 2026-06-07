@@ -12,7 +12,7 @@ createRuntimeTests({
 				content: "NODE_CLI_LANG=fr"
 			},
 			expectedExitCode: 1,
-			expectOutput: [outputs.unknownModuleError, outputs.fullHelpUsage]
+			expectOutput: [outputs.unknownModuleError, outputs.modulesHelpUsage]
 		}
 	]
 });

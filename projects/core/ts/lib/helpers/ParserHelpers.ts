@@ -117,13 +117,13 @@ export class ParserHelpers<
 		if (!entry) {
 			switch (phase) {
 				case 'globalFlags':
-					await this._ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: rawKey } });
+					await this._ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: rawKey, scope } });
 					break;
 				case 'moduleFlags':
-					await this._ctx.events.warn('parserUnknownModuleFlag', { values: { flag: rawKey } });
+					await this._ctx.events.warn('parserUnknownModuleFlag', { values: { flag: rawKey, scope } });
 					break;
 				case 'actionFlags':
-					await this._ctx.events.warn('parserUnknownActionFlag', { values: { flag: rawKey } });
+					await this._ctx.events.warn('parserUnknownActionFlag', { values: { flag: rawKey, scope } });
 					break;
 				default: break;
 			}
@@ -184,13 +184,13 @@ export class ParserHelpers<
 		if (body.length === 0) {
 			switch (phase) {
 				case 'globalFlags':
-					await this._ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: token } });
+					await this._ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: token, scope } });
 					break;
 				case 'moduleFlags':
-					await this._ctx.events.warn('parserUnknownModuleFlag', { values: { flag: token } });
+					await this._ctx.events.warn('parserUnknownModuleFlag', { values: { flag: token, scope } });
 					break;
 				case 'actionFlags':
-					await this._ctx.events.warn('parserUnknownActionFlag', { values: { flag: token } });
+					await this._ctx.events.warn('parserUnknownActionFlag', { values: { flag: token, scope } });
 					break;
 				default: break;
 			}
@@ -210,13 +210,13 @@ export class ParserHelpers<
 			if (!entry) {
 				switch (phase) {
 					case 'globalFlags':
-						await this._ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: token } });
+						await this._ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: token, scope } });
 						break;
 					case 'moduleFlags':
-						await this._ctx.events.warn('parserUnknownModuleFlag', { values: { flag: token } });
+						await this._ctx.events.warn('parserUnknownModuleFlag', { values: { flag: token, scope } });
 						break;
 					case 'actionFlags':
-						await this._ctx.events.warn('parserUnknownActionFlag', { values: { flag: token } });
+						await this._ctx.events.warn('parserUnknownActionFlag', { values: { flag: token, scope } });
 						break;
 					default: break;
 				}
@@ -250,13 +250,13 @@ export class ParserHelpers<
 			if (!entry) {
 				switch (phase) {
 					case 'globalFlags':
-						await this._ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: token } });
+						await this._ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: token, scope } });
 						break;
 					case 'moduleFlags':
-						await this._ctx.events.warn('parserUnknownModuleFlag', { values: { flag: token } });
+						await this._ctx.events.warn('parserUnknownModuleFlag', { values: { flag: token, scope } });
 						break;
 					case 'actionFlags':
-						await this._ctx.events.warn('parserUnknownActionFlag', { values: { flag: token } });
+						await this._ctx.events.warn('parserUnknownActionFlag', { values: { flag: token, scope } });
 						break;
 					default: break;
 				}
@@ -295,13 +295,13 @@ export class ParserHelpers<
 			if (!entry) {
 				switch (phase) {
 					case 'globalFlags':
-						await this._ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: `${rawKey} in group "${token}"` } });
+						await this._ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: `${rawKey} in group "${token}"`, scope } });
 						break;
 					case 'moduleFlags':
-						await this._ctx.events.warn('parserUnknownModuleFlag', { values: { flag: `${rawKey} in group "${token}"` } });
+						await this._ctx.events.warn('parserUnknownModuleFlag', { values: { flag: `${rawKey} in group "${token}"`, scope } });
 						break;
 					case 'actionFlags':
-						await this._ctx.events.warn('parserUnknownActionFlag', { values: { flag: `${rawKey} in group "${token}"` } });
+						await this._ctx.events.warn('parserUnknownActionFlag', { values: { flag: `${rawKey} in group "${token}"`, scope } });
 						break;
 					default: break;
 				}

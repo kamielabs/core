@@ -163,17 +163,22 @@ export const helpAction = <
 
 			if (arg2.startsWith("-")) {
 				if (module.defaultAction) {
+					if (!module.defaultAction.__defaultAction__.options) return { route: "actionFlagNotFound", module: moduleKey, action: "__defaultAction__", flag: arg2 };
 					const actionFlag = resolveFlag(arg2, snapshot.modules.flagIndex.action[moduleKey]!["__defaultAction__"]);
 
 					if (actionFlag.found) return { route: "actionFlagHelp", module: moduleKey, action: "__defaultAction__", flag: actionFlag.name };
 					return { route: "actionFlagNotFound", module: moduleKey, action: "__defaultAction__", flag: arg2 };
 				}
 
+				if (!module.options) return { route: "moduleFlagNotFound", module: moduleKey, flag: arg2 };
+
 				const moduleFlag = resolveFlag(arg2, snapshot.modules.flagIndex.module[moduleKey]);
 
 				if (moduleFlag.found) return { route: "moduleFlagHelp", module: moduleKey, flag: moduleFlag.name };
 				return { route: "moduleFlagNotFound", module: moduleKey, flag: moduleFlag.name };
 			}
+
+			if (module.defaultAction) return { route: "actionNotSupported", module: moduleKey }
 
 			const actionKey = resolveCanonical(arg2, snapshot.modules.actionIndex.byModule[moduleKey]?.byAlias);
 			const action = snapshot.modules.actionIndex.byModule[moduleKey]!.byName[actionKey];
@@ -185,6 +190,8 @@ export const helpAction = <
 			consumeArg();
 
 			if (arg3.startsWith("-")) {
+				if (!action.options) return { route: "actionFlagNotFound", module: moduleKey, action: actionKey, flag: arg3 };
+
 				const actionFlag = resolveFlag(arg3, snapshot.modules.flagIndex.action[moduleKey]![actionKey]);
 				if (actionFlag.found) return { route: "actionFlagHelp", module: moduleKey, action: actionKey, flag: actionFlag.name };
 				return { route: "actionFlagNotFound", module: moduleKey, action: actionKey, flag: arg3 };
@@ -222,6 +229,7 @@ export const helpAction = <
 			case "globalFlagNotFound": return renderHelpError(helpCli, help);
 			case "moduleNotFound": return renderHelpError(helpCli, help);
 			case "moduleFlagNotFound": return renderHelpError(helpCli, help);
+			case "actionNotSupported": return renderHelpError(helpCli, help);
 			case "actionNotFound": return renderHelpError(helpCli, help);
 			case "actionFlagNotFound": return renderHelpError(helpCli, help);
 			case "helpFlagConflictError": return renderHelpError(helpCli, help);

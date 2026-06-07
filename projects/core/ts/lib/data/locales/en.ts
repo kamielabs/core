@@ -113,13 +113,17 @@ export const BUILTIN_EN_MESSAGES = {
 		name: 'core.parser.usage.module',
 		content: "Help: {helpCli} {module}"
 	},
+	parserUsageAllModules: {
+		name: 'core.parser.usage.all.modules',
+		content: "Help: {helpCli} -M"
+	},
 	parserUsageAction: {
 		name: 'core.parser.usage.action',
 		content: "Help: {helpCli} {module} {action}"
 	},
 	parserUsageGlobalFlag: {
 		name: 'core.parser.usage.global.flag',
-		content: "Help: {helpCli} {flag}"
+		content: "Help: {helpCli} -G"
 	},
 	parserUsageModuleFlag: {
 		name: 'core.parser.usage.module.flag',
