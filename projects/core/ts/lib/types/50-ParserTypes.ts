@@ -83,4 +83,4 @@ export interface ArgsPhaseResult {
 export type CLIHelpMode = "single" | 'modular';
 export type FlagScope = "global" | "module" | "action";
 
-export type UsageRoute = "fullUsage" | "moduleUsage" | "actionUsage" | "flagUsage";
+export type UsageRoute = "fullUsage" | "allGlobalOptionsUsage" | "allModulesUsage" | "moduleUsage" | "flagUsage" | "actionUsage";

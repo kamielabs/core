@@ -729,27 +729,27 @@ export class ModulesManager<
 		if (events.length !== 1) { return "fullUsage"; }
 		const event = events[0]!;
 		switch (event.name) {
-			case 'CORE_PARSER_UNKNOWN_MODULE':
-				return "fullUsage";
-			case 'CORE_PARSER_MISSING_MODULE':
-				return "fullUsage";
-			case 'CORE_PARSER_UNKNOWN_ACTION':
+			case 'core.parser.unknown.module':
+				return "allModulesUsage";
+			case 'core.parser.missing.module':
+				return "allModulesUsage";
+			case 'core.parser.unknown.action':
 				return "moduleUsage";
-			case 'CORE_PARSER_MISSING_ACTION':
+			case 'core.parser.missing.action':
 				return "moduleUsage";
-			case 'CORE_PARSER_UNKNOWN_GLOBAL_FLAG':
-				return "fullUsage";
-			case 'CORE_PARSER_UNKNOWN_MODULE_FLAG':
+			case 'core.parser.unknown.global.flag':
+				return "flagUsage";
+			case 'core.parser.unknown.module.flag':
 				return "moduleUsage";
-			case 'CORE_PARSER_UNKNOWN_ACTION_FLAG':
+			case 'core.parser.unknown.action.flag':
 				return "actionUsage";
-			case 'CORE_PARSER_DUPLICATE_FLAG':
+			case 'core.parser.duplicate.flag':
 				return "flagUsage";
-			case 'CORE_PARSER_MISSING_FLAG_VALUE':
+			case 'core.parser.missing.flag.value':
 				return "flagUsage";
-			case 'CORE_PARSER_UNEXPECTED_FLAG_VALUE':
+			case 'core.parser.unexpected.flag.value':
 				return "flagUsage";
-			case 'CORE_PARSER_INVALID_SHORT_GROUP':
+			case 'core.parser.invalid.short.group':
 				return "flagUsage";
 			default: return "fullUsage";
 		}
@@ -780,6 +780,7 @@ export class ModulesManager<
 
 		switch (route) {
 			case 'fullUsage': return this._ctx.events.throw(fullUsageMode, { values: { helpCli } })
+			case 'allModulesUsage': return this._ctx.events.throw('parserUsageAllModules', { values: { helpCli, module } });
 			case 'moduleUsage': return this._ctx.events.throw('parserUsageModule', { values: { helpCli, module } });
 			case 'actionUsage': {
 				if (action === "__defaultAction__") return this._ctx.events.throw('parserUsageModule', { values: { helpCli, module } });
@@ -788,7 +789,9 @@ export class ModulesManager<
 			case 'flagUsage': {
 				const flag = firstIssue.values?.flag;
 				const scope = firstIssue.values?.scope;
+
 				if (flag === undefined || scope === undefined) return this._ctx.events.throw(fullUsageMode, { values: { helpCli } });
+
 				switch (scope) {
 					case 'globals': return this._ctx.events.throw('parserUsageGlobalFlag', { values: { helpCli, flag } });
 					case 'module': return this._ctx.events.throw('parserUsageModuleFlag', { values: { helpCli, flag, module } });

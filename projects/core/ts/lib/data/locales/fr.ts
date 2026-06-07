@@ -109,6 +109,10 @@ export const BUILTIN_FR_MESSAGES = {
 		name: 'core.parser.usage.modular',
 		content: "Full Help: {helpCli}"
 	},
+	parserUsageAllModules: {
+		name: 'core.parser.usage.all.modules',
+		content: "Help: {helpCli} {module}"
+	},
 	parserUsageModule: {
 		name: 'core.parser.usage.module',
 		content: "Help: {helpCli} {module}"

@@ -119,6 +119,12 @@ export const BUILTIN_PARSER_EVENTS = {
 		kind: CoreEventKind.message,
 		phase: CoreEventPhase.parser
 	},
+	parserUsageAllModules: {
+		name: 'core.parser.usage.all.modules',
+		level: CoreEventLevel.error,
+		kind: CoreEventKind.message,
+		phase: CoreEventPhase.parser
+	},
 	parserUsageModule: {
 		name: 'core.parser.usage.module',
 		level: CoreEventLevel.error,

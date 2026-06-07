@@ -23,7 +23,7 @@
 		"lint": "eslint",
 		"lint:fix": "eslint --fix",
 		"typecheck": "tsc --noEmit",
-		"test": "vitest run",
+		"test": "tsx scripts/test.ts",
 		"check": "pnpm typecheck && pnpm lint && pnpm test"
 	},
 	"devDependencies": {

@@ -23,6 +23,7 @@ export type HelpRoute =
 	| { route: "globalFlagNotFound", flag: string }
 	| { route: "moduleNotFound", module: string }
 	| { route: "moduleFlagNotFound", module: string, flag: string }
+	| { route: "actionNotSupported", module: string }
 	| { route: "actionNotFound", module: string, action: string }
 	| { route: "actionFlagNotFound", module: string, action: string, flag: string }
 	| { route: "notAflagError", module: string, action: string, flag: string }
