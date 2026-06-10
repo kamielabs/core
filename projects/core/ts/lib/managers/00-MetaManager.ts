@@ -57,7 +57,7 @@ export class MetaManager<
 		this._ctx = ctx;
 		this._meta = {
 			core: {
-				version: "0.1.0-rc.1",
+				version: "0.1.0-rc.2",
 				author: "k4mie"
 			},
 			cli: {

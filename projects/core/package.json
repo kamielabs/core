@@ -1,6 +1,6 @@
 {
 	"name": "@kamie-oss/core",
-	"version": "0.1.0-rc.1",
+	"version": "0.1.0-rc.2",
 	"type": "module",
 	"main": "./dist/index.js",
 	"private": true,
@@ -24,7 +24,8 @@
 		"lint:fix": "eslint --fix",
 		"typecheck": "tsc --noEmit",
 		"test": "tsx scripts/test.ts",
-		"check": "pnpm typecheck && pnpm lint && pnpm test"
+		"check": "pnpm typecheck && pnpm lint && pnpm test",
+		"package": "pnpm check && pnpm pack"
 	},
 	"devDependencies": {
 		"@types/node": "^24.12.2",
