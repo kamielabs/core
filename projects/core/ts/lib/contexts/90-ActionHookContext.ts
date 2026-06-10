@@ -52,6 +52,24 @@ export type ModulesActionHookMethod<
 > =
 	ModulesManager<TEvents, TStages, TGlobals, TModules, TTranslations>["registerCustomActionHook"];
 
+export type BeforeActionHookMethod<
+	TEvents extends CoreEventsShape,
+	TStages extends CoreStagesShape,
+	TGlobals extends CoreGlobalsShape,
+	TModules extends CoreModulesShape,
+	TTranslations extends CoreTranslationsShape
+> =
+	ModulesManager<TEvents, TStages, TGlobals, TModules, TTranslations>["registerBeforeActionHook"]
+
+export type AfterActionHookMethod<
+	TEvents extends CoreEventsShape,
+	TStages extends CoreStagesShape,
+	TGlobals extends CoreGlobalsShape,
+	TModules extends CoreModulesShape,
+	TTranslations extends CoreTranslationsShape
+> =
+	ModulesManager<TEvents, TStages, TGlobals, TModules, TTranslations>["registerAfterActionHook"]
+
 /**
  * RuntimeFullContext
  *
@@ -173,6 +191,19 @@ export type ActionHook<
 	 */
 	snapshot: SnapshotFullContext<TEvents, TStages, TGlobals, TModules, TTranslations>;
 
+	live: LiveActionContext;
+}) => void | Promise<void>;
+
+export type RuntimeHook<
+	TEvents extends CoreEventsShape,
+	TStages extends CoreStagesShape,
+	TGlobals extends CoreGlobalsShape,
+	TModules extends CoreModulesShape,
+	TTranslations extends CoreTranslationsShape
+> = (ctx: {
+	tools: ToolsActionContext<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	runtime: RuntimeFullContext;
+	snapshot: SnapshotFullContext<TEvents, TStages, TGlobals, TModules, TTranslations>;
 	live: LiveActionContext;
 }) => void | Promise<void>;
 

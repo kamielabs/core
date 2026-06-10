@@ -2,7 +2,8 @@ import {
 	Context,
 	ActionHook,
 	RuntimeActionHook,
-	ModuleHook
+	ModuleHook,
+	RuntimeHook
 } from "@contexts";
 
 import {
@@ -133,6 +134,28 @@ export class ModulesManager<
 			CustomModuleFlags<TModules, M>
 		>
 	} = {};
+
+	/**
+	 * Before action runtime hook.
+	 */
+	private _beforeActionHook?: RuntimeHook<
+		TEvents,
+		TStages,
+		TGlobals,
+		TModules,
+		TTranslations
+	>;
+
+	/**
+	 * After action runtime hook.
+	 */
+	private _afterActionHook?: RuntimeHook<
+		TEvents,
+		TStages,
+		TGlobals,
+		TModules,
+		TTranslations
+	>;
 
 	/**
 	 * Builtin action hooks registry.
@@ -841,14 +864,29 @@ export class ModulesManager<
 			});
 		}
 
+		const runtimeCtx = {
+			tools: this._ctx.tools.actionContext(),
+			runtime: this._ctx.runtime.actionContext(),
+			snapshot: this._ctx.snapshot.snapshotContext(),
+			live: {
+				events: this._ctx.events.getLive().list
+			}
+		};
+
+		if (this._beforeActionHook) {
+			await this._beforeActionHook(runtimeCtx);
+		}
+
+		// Execute Action Hook
 		await hook({
 			options: resolved.actionOptions,
 			args: resolved.args,
-			runtime: this._ctx.runtime.actionContext(),
-			tools: this._ctx.tools.actionContext(),
-			snapshot: this._ctx.snapshot.snapshotContext(),
-			live: { events: this._ctx.events.getLive().list }
+			...runtimeCtx
 		});
+
+		if (this._afterActionHook) {
+			await this._afterActionHook(runtimeCtx);
+		}
 	}
 
 	// -----------------------------------------------------
@@ -949,6 +987,35 @@ export class ModulesManager<
 		});
 	}
 
+	/**
+	 * Register before action hook.
+	 */
+	public registerBeforeActionHook(
+		hook: RuntimeHook<
+			TEvents,
+			TStages,
+			TGlobals,
+			TModules,
+			TTranslations
+		>
+	): void {
+		this._beforeActionHook = hook;
+	}
+
+	/**
+	 * Register after action hook.
+	 */
+	public registerAfterActionHook(
+		hook: RuntimeHook<
+			TEvents,
+			TStages,
+			TGlobals,
+			TModules,
+			TTranslations
+		>
+	): void {
+		this._afterActionHook = hook;
+	}
 	// -----------------------------------------------------
 	// ACTION HOOKS
 	// -----------------------------------------------------

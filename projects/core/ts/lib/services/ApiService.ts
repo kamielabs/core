@@ -7,6 +7,8 @@ import {
 } from "@types";
 
 import {
+	AfterActionHookMethod,
+	BeforeActionHookMethod,
 	Context,
 	GlobalsHookMethod,
 	ModulesActionHookMethod,
@@ -160,6 +162,19 @@ export class ApiService<
 		return this._ctx.modules.registerCustomModuleHook(module, hook);
 	};
 
+
+	public onBeforeAction: BeforeActionHookMethod<
+		TEvents, TStages, TGlobals, TModules, TTranslations
+	> = (hook) => {
+		return this._ctx.modules.registerBeforeActionHook(hook)
+	};
+
+
+	public onAfterAction: AfterActionHookMethod<
+		TEvents, TStages, TGlobals, TModules, TTranslations
+	> = (hook) => {
+		return this._ctx.modules.registerAfterActionHook(hook)
+	};
 	/**
 	 * Register an action hook for a module.
 	 *
