@@ -18,7 +18,8 @@ import {
 	DefaultStageOptions,
 	ParsedOptionValue,
 	RuntimeStageFacts,
-	StageOption
+	StageOption,
+	StageShape
 } from "@types";
 
 /**
@@ -256,6 +257,20 @@ export class StagesManager<
 		}
 	}
 
+	private _resolveStageFile(
+		stageName: string,
+		stage: StageShape,
+	): string {
+		if (
+			stageName === "default" &&
+			this._builtinStageDefaults?.file
+		) {
+			return this._builtinStageDefaults.file;
+		}
+
+		return stage.file ?? "";
+	}
+
 	/**
 	 * Resolve a single option value.
 	 *
@@ -296,25 +311,42 @@ export class StagesManager<
 	 *
 	 * Applies only on draft (pre-resolution finalization).
 	 */
-	private _applyBuiltinStageDefaults() {
+	// private _applyBuiltinStageDefaults() {
+	// 	const values = this._builtinStageDefaults;
+	// 	if (!values) return;
+	//
+	//
+	// 	if (values.file !== undefined) {
+	// 		this.getDraft().file = values.file;
+	// 	}
+	//
+	// 	if (values.options) {
+	// 		for (const key of Object.keys(values.options) as Array<keyof typeof values.options>) {
+	// 			const value = values.options[key];
+	// 			if (value !== undefined) {
+	// 				(this.getDraft().options as Record<string, ParsedOptionValue>)[key] = value;
+	// 			}
+	// 		}
+	// 	}
+	// }
+	private _applyBuiltinStageDefaults(
+		stageName: string,
+		stage: StageShape,
+	): StageShape {
 		const values = this._builtinStageDefaults;
-		if (!values) return;
 
-
-		if (values.file !== undefined) {
-			this.getDraft().file = values.file;
+		if (!values || stageName !== "default") {
+			return stage;
 		}
+		const file = values.file ?? stage.file;
 
-		if (values.options) {
-			for (const key of Object.keys(values.options) as Array<keyof typeof values.options>) {
-				const value = values.options[key];
-				if (value !== undefined) {
-					(this.getDraft().options as Record<string, ParsedOptionValue>)[key] = value;
-				}
-			}
-		}
+		return {
+			...(file !== undefined ? { file } : {}),
+			options: {
+				...stage.options,
+			},
+		};
 	}
-
 	/**
 	 * Override builtin default stage values.
 	 *
@@ -442,6 +474,7 @@ export class StagesManager<
 				: rawStage;
 
 		const stage = this._dict.stageIndex.byName[stageName];
+
 		if (!stage) {
 			this._ctx.events.throw('stageMissing', { details: [`Name: ${stageName}`] })
 		}
@@ -450,8 +483,12 @@ export class StagesManager<
 			this._ctx.events.throw('stageMissingFile', { details: [`StageFile: ${stage.file}`] });
 		}
 
+		if (stageName === "default") this._applyBuiltinStageDefaults(stageName, stage);
+
 		const envVars = process.env as Record<string, string | undefined>;
-		const fileEnv = this._ctx.helpers.core.loadEnvFile(stage.file);
+		const stageFile = this._resolveStageFile(stageName, stage);
+
+		const fileEnv = this._ctx.helpers.core.loadEnvFile(stageFile);
 
 		const resolvedOptions: Record<string, ParsedOptionValue> = {};
 
@@ -471,9 +508,9 @@ export class StagesManager<
 		this._setDraft(facts);
 
 		// Apply defaults only for builtin stage
-		if (Object.hasOwn(this._builtinStageHooks, stageName)) {
-			this._applyBuiltinStageDefaults();
-		}
+		// if (Object.hasOwn(this._builtinStageHooks, stageName)) {
+		// 	this._applyBuiltinStageDefaults();
+		// }
 
 		await this._ctx.events.emit('stageHooking');
 

@@ -209,3 +209,16 @@ export type CoreMetaShape = {
 	}
 }
 
+// Paths Management
+export interface PathAlias {
+	value: string;
+	rootOnly: boolean;
+}
+
+export type PathAliases = Record<string, PathAlias>;
+
+export interface ResolvePathOptions {
+	aliases?: PathAliases;
+	env?: Record<string, string | undefined>;
+	strict?: boolean;
+}

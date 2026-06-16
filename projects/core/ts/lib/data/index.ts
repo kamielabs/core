@@ -6,3 +6,4 @@ export * from "./20-StagesBuiltins";
 export * from "./30-GlobalsBuiltins";
 export * from "./40-ModulesBuiltins";
 export * from "./50-EnginesBuiltins";
+export * from "./PathAliasesBuiltins";

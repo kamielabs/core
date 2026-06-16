@@ -10,14 +10,19 @@
 // TODO: ARCHITECTURE — Integrate all helpers into Context (ctx.helpers.*)
 // Currently only CoreHelpers is context-bound due to providers dependency
 
+import path from "node:path";
+
 import { Context } from "@contexts";
 import {
 	CoreEventsShape,
 	CoreGlobalsShape,
 	CoreModulesShape,
 	CoreStagesShape,
-	CoreTranslationsShape
+	CoreTranslationsShape,
+	PathAliases,
+	ResolvePathOptions
 } from "@types";
+import { DEFAULT_PATH_ALIASES } from "@data";
 
 /**
  * CoreHelpers
@@ -148,9 +153,26 @@ export class CoreHelpers<
 	public loadEnvFile(
 		filePath?: string
 	): Record<string, string> {
-		if (!filePath || !this.ctx.providers.fs.fileExist(filePath)) return {};
+		let resolvedFilePath = filePath;
 
-		const content = this.ctx.providers.fs.readTextFile(filePath);
+		if (resolvedFilePath) {
+			resolvedFilePath = this.ctx.helpers.core.resolvePath(
+				resolvedFilePath,
+				{
+					env: process.env,
+					strict: true,
+				},
+			);
+		}
+
+		if (
+			!resolvedFilePath ||
+			!this.ctx.providers.fs.fileExist(resolvedFilePath)
+		) {
+			return {};
+		}
+
+		const content = this.ctx.providers.fs.readTextFile(resolvedFilePath);
 		const env: Record<string, string> = {};
 
 		for (const rawLine of content.split("\n")) {
@@ -234,4 +256,72 @@ export class CoreHelpers<
 	) {
 		return CoreHelpers.isValidRuntimeName(key, isBuiltin);
 	}
+
+	public expandPathAliases(
+		input: string,
+		aliases: PathAliases,
+	): string {
+		let output = input;
+
+		for (const [alias, definition] of Object.entries(aliases)) {
+			if (definition.rootOnly) {
+				if (
+					output === alias ||
+					output.startsWith(`${alias}/`) ||
+					output.startsWith(`${alias}\\`)
+				) {
+					output = definition.value + output.slice(alias.length);
+				}
+
+				continue;
+			}
+
+			output = output.split(alias).join(definition.value);
+		}
+
+		return output;
+	}
+
+	public resolvePathEnvVars(
+		input: string,
+		env: Record<string, string | undefined>,
+		strict = true,
+	): string {
+		return input.replace(
+			/\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$([A-Za-z_][A-Za-z0-9_]*)/g,
+			(_match, bracedName, simpleName) => {
+				const variableName = bracedName ?? simpleName;
+				const variableValue = env[variableName];
+
+				if (variableValue !== undefined) {
+					return variableValue;
+				}
+
+				if (strict) {
+					throw new Error(
+						`Unable to resolve environment variable "${variableName}".`,
+					);
+				}
+
+				return "";
+			},
+		);
+	}
+
+	resolvePath(
+		input: string,
+		options: ResolvePathOptions = {},
+	): string {
+		const aliases = options.aliases ?? DEFAULT_PATH_ALIASES;
+		const env = options.env ?? process.env;
+		const strict = options.strict ?? true;
+
+		let output = input;
+
+		output = this.expandPathAliases(output, aliases);
+		output = this.resolvePathEnvVars(output, env, strict);
+
+		return path.normalize(output);
+	}
+
 }
