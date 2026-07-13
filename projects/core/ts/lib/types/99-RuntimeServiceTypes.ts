@@ -55,3 +55,5 @@ export type RuntimeFullFacts = {
 	parser?: ParsedCliContextResult; // TEMPORARY key for getting parser status for actionHook contexts 'til parser context becomes events
 }
 
+export type RuntimeAppShape = Record<string, unknown>;
+

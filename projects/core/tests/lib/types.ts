@@ -1,5 +1,5 @@
 import { CLI } from "@kamie-oss/core";
-import { CLIOptions, CoreEventsShape, CoreGlobalsShape, CoreModulesShape, CoreStagesShape, CoreTranslationsShape } from "@types";
+import { CLIOptions, CoreEventsChannelsShape, CoreEventsShape, CoreGlobalsShape, CoreModulesShape, CoreStagesShape, CoreTranslationsShape, RuntimeAppShape } from "@types";
 
 export type RuntimeTest<TSetup = unknown> = {
 	name: string;
@@ -17,29 +17,35 @@ export type RuntimeTest<TSetup = unknown> = {
 
 export type RuntimeTestSuite<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape,
 	TSetup = unknown
 > = {
 	describe: string;
 
 	cli?: CLIOptions<
 		TEvents,
+		TChannels,
 		TStages,
 		TGlobals,
 		TModules,
-		TTranslations
+		TTranslations,
+		TApp
 	>;
 
 	setup?: (
 		cli: CLI<
 			TEvents,
+			TChannels,
 			TStages,
 			TGlobals,
 			TModules,
-			TTranslations
+			TTranslations,
+			TApp
 		>
 	) => TSetup;
 

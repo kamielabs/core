@@ -1,12 +1,14 @@
 import { dirname } from "node:path"; // Put this in providers ??
-import { Context } from "@contexts";
+import { BootstrapManagerContext } from "@contexts";
 import {
 	CoreEventsShape,
-	CoreModulesShape,
+	RuntimeCoreFacts,
+	CoreTranslationsShape,
+	CoreEventsChannelsShape,
 	CoreStagesShape,
 	CoreGlobalsShape,
-	RuntimeCoreFacts,
-	CoreTranslationsShape
+	CoreModulesShape,
+	RuntimeAppShape
 } from "@types";
 
 /**
@@ -41,17 +43,33 @@ import {
  */
 export class BootstrapManager<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > {
 
-	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private _ctx: BootstrapManagerContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 	private _resolved?: RuntimeCoreFacts
 
-	constructor(ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>) {
+	private constructor(ctx: BootstrapManagerContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>) {
 		this._ctx = ctx;
+	}
+
+	public static create<
+		TEvents extends CoreEventsShape,
+		TChannels extends CoreEventsChannelsShape,
+		TStages extends CoreStagesShape,
+		TGlobals extends CoreGlobalsShape,
+		TModules extends CoreModulesShape,
+		TTranslations extends CoreTranslationsShape,
+		TApp extends RuntimeAppShape
+	>(
+		ctx: BootstrapManagerContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
+	): BootstrapManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp> {
+		return new BootstrapManager(ctx);
 	}
 
 	public init: () => Promise<void> = async (): Promise<void> => { };

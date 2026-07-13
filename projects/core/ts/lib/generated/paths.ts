@@ -22,6 +22,7 @@ export const PATHS: AliasMap = {
   "@builders": ["ts/lib/builders"],
   "@engines": ["ts/lib/engines"],
   "@managers": ["ts/lib/managers"],
+  "@api": ["ts/lib/api"],
   "@services": ["ts/lib/services"],
   "@plugins": ["ts/lib/plugins"],
   "@generated/*": ["ts/lib/generated/*"],

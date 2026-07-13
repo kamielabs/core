@@ -2,6 +2,7 @@ import {
 	CoreEventKind,
 	CoreEventLevel,
 	CoreEventPhase,
+	CoreEventScope,
 	CoreEventsShape
 } from "@types";
 
@@ -19,32 +20,37 @@ export const BUILTIN_RUNTIME_EVENTS = {
 		name: 'core.runtime.missing.draft',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
-		phase: CoreEventPhase.runtime
+		phase: CoreEventPhase.runtime,
+		scope: CoreEventScope.app
 	},
 	runtimeAlreadyResolved: {
 		name: 'core.runtime.already.resolved',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
-		phase: CoreEventPhase.runtime
+		phase: CoreEventPhase.runtime,
+		scope: CoreEventScope.app
 	},
 	runtimeMissingResolved: {
 		name: 'core.runtime.missing.resolved',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
-		phase: CoreEventPhase.runtime
+		phase: CoreEventPhase.runtime,
+		scope: CoreEventScope.app
 	},
 	// Runtime Transition Fatal (have to be signals)
 	runtimeInvalidTransition: {
 		name: 'core.runtime.invalid.transition',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
-		phase: CoreEventPhase.runtime
+		phase: CoreEventPhase.runtime,
+		scope: CoreEventScope.app
 	},
 	runtimeMissingEvent: {
 		name: 'core.runtime.missing.event',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.runtime,
+		scope: CoreEventScope.app,
 		trigger: false
 	},
 
@@ -54,6 +60,7 @@ export const BUILTIN_RUNTIME_EVENTS = {
 		level: CoreEventLevel.trace,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.runtime,
+		scope: CoreEventScope.core,
 		trigger: true
 	},
 	runtimeErrorModuleHelp: {
@@ -61,12 +68,14 @@ export const BUILTIN_RUNTIME_EVENTS = {
 		level: CoreEventLevel.error,
 		kind: CoreEventKind.message,
 		phase: CoreEventPhase.runtime,
+		scope: CoreEventScope.app,
 	},
 	runtimeReady: {
 		name: 'core.runtime.ready',
 		level: CoreEventLevel.trace,
 		kind: CoreEventKind.message,
 		phase: CoreEventPhase.runtime,
+		scope: CoreEventScope.core,
 		trigger: true
 	}
 } as const satisfies CoreEventsShape;

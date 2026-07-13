@@ -10,18 +10,11 @@ const LangOption: Option<typeof LANG_ENV, string> = {
 }
 
 
-const workingDirOption: Option<typeof WORKING_DIR_ENV, string> = {
-	env: WORKING_DIR_ENV,
-	default: "",
-	description: 'Working directory used in stage'
-}
-
 export const BUILTIN_STAGES = {
 	'default': {
 		file: ".env",
 		options: {
-			lang: LangOption,
-			workingDir: workingDirOption,
+			lang: LangOption
 		}
 	}
 } as const satisfies CoreStagesShape;

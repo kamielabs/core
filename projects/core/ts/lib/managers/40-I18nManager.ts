@@ -1,6 +1,6 @@
-import { Context } from "@contexts";
+import { I18nManagerContext } from "@contexts";
 import { BUILTIN_MESSAGES, FinalTranslations } from "@data";
-import { CoreEventKind, CoreEventsShape, CoreGlobalsShape, CoreMessage, CoreModulesShape, CoreStagesShape, CoreTranslationsDecl, CoreTranslationsShape, RuntimeI18nFacts } from "@types";
+import { CoreEventKind, CoreEventsChannelsShape, CoreEventsShape, CoreGlobalsShape, CoreMessage, CoreModulesShape, CoreStagesShape, CoreTranslationsDecl, CoreTranslationsShape, RuntimeAppShape, RuntimeI18nFacts } from "@types";
 
 /**
  * TODO: V0.1: Polish the entire class: remove the builtins hook methods for old builtin stages and their caller method
@@ -46,13 +46,15 @@ import { CoreEventKind, CoreEventsShape, CoreGlobalsShape, CoreMessage, CoreModu
  */
 export class I18nManager<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > {
 
-	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private _ctx: I18nManagerContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 	private _dict: CoreTranslationsDecl<TTranslations>;
 	private _resolved?: RuntimeI18nFacts;
 
@@ -65,8 +67,8 @@ export class I18nManager<
 	 * @param ctx - Global execution context
 	 * @param translationsDict - Final normalized translations dictionary
 	 */
-	constructor(
-		ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>,
+	private constructor(
+		ctx: I18nManagerContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>,
 		translations: FinalTranslations<TTranslations>
 	) {
 		this._ctx = ctx;
@@ -78,14 +80,28 @@ export class I18nManager<
 				byLang: {}
 			}
 		};
-		// this._resolveIndexes();
-		// this._freezeDict();
+	}
+
+	public static create<
+		TEvents extends CoreEventsShape,
+		TChannels extends CoreEventsChannelsShape,
+		TStages extends CoreStagesShape,
+		TGlobals extends CoreGlobalsShape,
+		TModules extends CoreModulesShape,
+		TTranslations extends CoreTranslationsShape,
+		TApp extends RuntimeAppShape
+	>(
+		ctx: I18nManagerContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>,
+		translations: FinalTranslations<TTranslations>
+	): I18nManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp> {
+		return new I18nManager(ctx, translations);
 	}
 
 	public init: () => Promise<void> = async (): Promise<void> => {
 		await this._resolveIndexes();
 		this._freezeDict();
 	};
+
 	private _freezeDict() {
 		this._dict = this._ctx.helpers.core.deepFreeze(this._dict);
 	}

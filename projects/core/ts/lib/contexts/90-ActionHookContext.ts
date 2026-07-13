@@ -9,12 +9,14 @@
 // - No direct mutation of runtime state is allowed
 
 import {
+	CoreEventsChannelsShape,
 	CoreEventsShape,
 	CoreGlobalsShape,
 	CoreModulesShape,
 	CoreStagesShape,
 	CoreTranslationsShape,
 	ParsedOptionValue,
+	RuntimeAppShape,
 	RuntimeCoreEvent,
 	RuntimeFullFacts
 } from "@types";
@@ -26,6 +28,7 @@ import {
 	MessageThrowHookMethod,
 	MessageTraceHookMethod,
 	MessageWarnHookMethod,
+	ResolvePathHelperMethod,
 	SignalDebugHookMethod,
 	SignalInfoHookMethod,
 	SignalThrowHookMethod,
@@ -45,30 +48,36 @@ import { ModulesManager } from "@managers";
  */
 export type ModulesActionHookMethod<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > =
-	ModulesManager<TEvents, TStages, TGlobals, TModules, TTranslations>["registerCustomActionHook"];
+	ModulesManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>["registerCustomActionHook"];
 
 export type BeforeActionHookMethod<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > =
-	ModulesManager<TEvents, TStages, TGlobals, TModules, TTranslations>["registerBeforeActionHook"]
+	ModulesManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>["registerBeforeActionHook"]
 
 export type AfterActionHookMethod<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > =
-	ModulesManager<TEvents, TStages, TGlobals, TModules, TTranslations>["registerAfterActionHook"]
+	ModulesManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>["registerAfterActionHook"]
 
 /**
  * RuntimeFullContext
@@ -84,7 +93,7 @@ export type AfterActionHookMethod<
  *
  * This is the most complete runtime view available in the system.
  */
-export type RuntimeFullContext = RuntimeFullFacts;
+export type RuntimeFullContext<TApp extends RuntimeAppShape> = RuntimeFullFacts & { app: TApp };
 
 /**
  * ToolsActionContext
@@ -112,32 +121,39 @@ export type RuntimeFullContext = RuntimeFullFacts;
 // }
 export type ToolsActionContext<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > = {
 	/**
 	 * Emit a signal event.
 	 */
 	signal: {
-		trace: SignalTraceHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		debug: SignalDebugHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		info: SignalInfoHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		warn: SignalWarnHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		throw: SignalThrowHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		trace: SignalTraceHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		debug: SignalDebugHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		info: SignalInfoHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		warn: SignalWarnHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		throw: SignalThrowHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 	};
 	/**
 	 * Emit a user-facing message.
 	 */
 	message: {
-		trace: MessageTraceHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		debug: MessageDebugHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		info: MessageInfoHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		warn: MessageWarnHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		throw: MessageThrowHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		trace: MessageTraceHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		debug: MessageDebugHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		info: MessageInfoHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		warn: MessageWarnHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		throw: MessageThrowHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 	};
-	getEvents: GetFilteredEventsMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	events: {
+		get: GetFilteredEventsMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+	};
+	paths: {
+		resolve: ResolvePathHelperMethod;
+	}
 }
 
 export type LiveActionContext = {
@@ -164,10 +180,12 @@ export type LiveActionContext = {
  */
 export type ActionHook<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape,
 	TOptions = Record<string, ParsedOptionValue>
 > = (ctx: {
 	/**
@@ -179,31 +197,33 @@ export type ActionHook<
 	/**
 	 * Controlled tools for side-effects.
 	 */
-	tools: ToolsActionContext<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	tools: ToolsActionContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 
 	/**
 	 * Full runtime facts (read-only).
 	 */
-	runtime: RuntimeFullContext;
+	runtime: RuntimeFullContext<TApp>;
 
 	/**
 	 * Full system snapshot.
 	 */
-	snapshot: SnapshotFullContext<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	snapshot: SnapshotFullContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations>;
 
 	live: LiveActionContext;
 }) => void | Promise<void>;
 
 export type RuntimeHook<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape,
 > = (ctx: {
-	tools: ToolsActionContext<TEvents, TStages, TGlobals, TModules, TTranslations>;
-	runtime: RuntimeFullContext;
-	snapshot: SnapshotFullContext<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	tools: ToolsActionContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+	runtime: RuntimeFullContext<TApp>;
+	snapshot: SnapshotFullContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations>;
 	live: LiveActionContext;
 }) => void | Promise<void>;
 
@@ -216,15 +236,19 @@ export type RuntimeHook<
  */
 export type RuntimeActionHook<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > = ActionHook<
 	TEvents,
+	TChannels,
 	TStages,
 	TGlobals,
 	TModules,
 	TTranslations,
+	TApp,
 	Record<string, ParsedOptionValue>
 >;

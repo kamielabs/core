@@ -2,6 +2,7 @@ import {
 	CoreEventKind,
 	CoreEventLevel,
 	CoreEventPhase,
+	CoreEventScope,
 	CoreEventsShape
 } from "@types";
 
@@ -19,12 +20,14 @@ export const BUILTIN_ENGINE_EVENTS = {
 		name: 'core.engine.unknown',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
-		phase: CoreEventPhase.runtime
+		phase: CoreEventPhase.runtime,
+		scope: CoreEventScope.app
 	},
 	engineUnknownRunner: {
 		name: 'core.engine.unknown.runner',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
-		phase: CoreEventPhase.runtime
+		phase: CoreEventPhase.runtime,
+		scope: CoreEventScope.app
 	},
 } as const satisfies CoreEventsShape;

@@ -3,16 +3,20 @@
 // - setCwd() is exposed in hook context but not yet implemented
 // - Must provide controlled mutation via RuntimeService (no direct state mutation)
 import {
+	CoreEventsChannelsShape,
 	CoreEventsShape,
 	CoreGlobalsShape,
 	CoreModulesShape,
 	CoreStagesShape,
 	CoreTranslationsShape,
 	ParsedOptionValue,
+	RuntimeAppShape,
 	RuntimeCoreFacts,
 	RuntimeStageFacts
 } from "@types";
 import {
+	GetFilteredEventsMethod,
+	ResolvePathHelperMethod,
 	SignalDebugHookMethod,
 	SignalInfoHookMethod,
 	SignalThrowHookMethod,
@@ -34,10 +38,12 @@ import { StagesManager } from "@managers";
  */
 export type ToolsStageContext<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > = {
 	/**
 	 * Emit a signal event (internal or user-defined).
@@ -48,20 +54,18 @@ export type ToolsStageContext<
 	 * - terminal errors (depending on event level)
 	 */
 	signal: {
-		trace: SignalTraceHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		debug: SignalDebugHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		info: SignalInfoHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		warn: SignalWarnHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		throw: SignalThrowHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		trace: SignalTraceHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		debug: SignalDebugHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		info: SignalInfoHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		warn: SignalWarnHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		throw: SignalThrowHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 	};
-
-	/**
-	 * Set working directory (planned feature).
-	 *
-	 * Will allow controlled mutation of cwd via runtime service.
-	 * Currently not implemented.
-	 */
-	setCwd: () => void;
+	events: {
+		get: GetFilteredEventsMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+	};
+	paths: {
+		resolve: ResolvePathHelperMethod;
+	}
 };
 
 /**
@@ -73,7 +77,7 @@ export type ToolsStageContext<
  * - Read-only by design
  * - Reflects the current state of the core at stage execution time
  */
-export type RuntimeStageContext = {
+export type RuntimeStageContext<TApp extends RuntimeAppShape> = {
 	/**
 	 * Core bootstrap facts (platform, env, etc.)
 	 */
@@ -83,6 +87,7 @@ export type RuntimeStageContext = {
 	 * Current resolved stage facts
 	 */
 	stage: RuntimeStageFacts;
+	app: TApp;
 };
 
 /**
@@ -98,10 +103,12 @@ export type RuntimeStageContext = {
  */
 export type StageHookContext<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape,
 	TOptions = Record<string, ParsedOptionValue>
 > = {
 	/**
@@ -115,12 +122,12 @@ export type StageHookContext<
 	/**
 	 * Controlled tools for emitting events and performing side-effects
 	 */
-	tools: ToolsStageContext<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	tools: ToolsStageContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 
 	/**
 	 * Runtime facts (read-only)
 	 */
-	runtime: RuntimeStageContext;
+	runtime: RuntimeStageContext<TApp>;
 
 	/**
 	 * Full snapshot of all resolved dictionaries
@@ -130,7 +137,7 @@ export type StageHookContext<
 	 * - debug
 	 * - cross-manager awareness
 	 */
-	snapshot: SnapshotFullContext<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	snapshot: SnapshotFullContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations>;
 };
 
 /**
@@ -148,18 +155,22 @@ export type StageHookContext<
  */
 export type StageHook<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape,
 	TOptions = Record<string, ParsedOptionValue>
 > = (
 	ctx: StageHookContext<
 		TEvents,
+		TChannels,
 		TStages,
 		TGlobals,
 		TModules,
 		TTranslations,
+		TApp,
 		TOptions
 	>
 ) => void | Promise<void>;
@@ -177,17 +188,21 @@ export type StageHook<
  */
 export type StagesDefaultHookMethod<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > =
 	StagesManager<
 		TEvents,
+		TChannels,
 		TStages,
 		TGlobals,
 		TModules,
-		TTranslations
+		TTranslations,
+		TApp
 	>["overrideDefaultStage"];
 
 /**
@@ -199,17 +214,21 @@ export type StagesDefaultHookMethod<
  */
 export type StagesBuiltinHookMethod<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > =
 	StagesManager<
 		TEvents,
+		TChannels,
 		TStages,
 		TGlobals,
 		TModules,
-		TTranslations
+		TTranslations,
+		TApp
 	>["registerBuiltinStageHook"];
 
 /**
@@ -221,15 +240,19 @@ export type StagesBuiltinHookMethod<
  */
 export type StagesCustomHookMethod<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > =
 	StagesManager<
 		TEvents,
+		TChannels,
 		TStages,
 		TGlobals,
 		TModules,
-		TTranslations
+		TTranslations,
+		TApp
 	>["registerCustomStageHook"];

@@ -10,16 +10,11 @@
 
 // TODO: ARCHITECTURE — Integrate into ctx.helpers.* (context-bound helpers)
 
-import { Context } from "@contexts";
 import { FinalModules } from "@data";
 import {
 	ActionFlagIndexEntries,
 	ActionIndex,
-	CoreEventsShape,
-	CoreGlobalsShape,
 	CoreModulesShape,
-	CoreStagesShape,
-	CoreTranslationsShape,
 	FlagIndex,
 	IndexedFlag,
 	ModuleFlagIndexEntries,
@@ -40,19 +35,14 @@ import {
  * - Pure functions (no side-effects)
  * - Operates on precomputed indexes
  */
-export class ModulesHelpers<
-	TEvents extends CoreEventsShape,
-	TStages extends CoreStagesShape,
-	TGlobals extends CoreGlobalsShape,
-	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
-> {
+export class ModulesHelpers {
 
-	private readonly _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
 
-	constructor(ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>) {
-		this._ctx = ctx;
-	};
+	private constructor() { }
+
+	public static create(): ModulesHelpers {
+		return new ModulesHelpers();
+	}
 
 	/**
 	 * Type guard: checks if object has "options"

@@ -8,4 +8,5 @@ export * from "./40-I18nManager";
 export * from "./50-ParserManager";
 export * from "./60-GlobalsManager";
 export * from "./70-ModulesManager";
+export * from "./80-RuntimeManager";
 export * from "./90-PluginsManager";

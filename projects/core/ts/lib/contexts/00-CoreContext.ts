@@ -19,7 +19,9 @@ import {
 	CoreModulesShape,
 	CLISettings,
 	CoreTranslationsShape,
-	HelpersContext
+	HelpersContext,
+	RuntimeAppShape,
+	CoreEventsChannelsShape
 } from "@types";
 import {
 	EventsManager,
@@ -30,42 +32,12 @@ import {
 	GlobalsManager,
 	ParserManager,
 	ModulesManager,
+	RuntimeManager,
 	// PluginManager
 } from "@managers";
 import { CoreEngine } from "@engines";
-import { ApiService, CoreConsoleService, RuntimeService, SnapshotService, ToolsService } from "@services";
 import { CoreProviders } from "@providers";
-
-/**
- * ContextCoreReady
- *
- * Tracks initialization state of each core component.
- *
- * Purpose:
- * - Ensure lifecycle correctness
- * - Prevent usage of components before they are ready
- *
- * Usage:
- * - Each component should check its corresponding flag before use if required
- */
-export interface ContextCoreReady {
-	providers: boolean;
-	helpers: boolean;
-	events: boolean;
-	coreconsole: boolean;
-	meta: boolean;
-	runtime: boolean;
-	tools: boolean;
-	snapshot: boolean;
-	devapi: boolean;
-	bootstrap: boolean;
-	stages: boolean;
-	i18n: boolean;
-	parser: boolean;
-	globals: boolean;
-	modules: boolean;
-	engine: boolean;
-}
+import { CoreAPIsContext, CoreServicesContext } from "@contexts";
 
 /**
  * Context
@@ -95,10 +67,12 @@ export interface ContextCoreReady {
  */
 export type Context<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > = {
 
 	/**
@@ -114,46 +88,41 @@ export type Context<
 	/**
 	 * Lifecycle readiness flags.
 	 */
-	ready: ContextCoreReady;
 
 	/**
 	 * Helpers exposed to the core and hooks.
 	 */
-	helpers: HelpersContext<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	helpers: HelpersContext;
 
 	/**
 	 * Events system manager.
 	 */
-	events: EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	events: EventsManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 
 	// ─────────────────────────────
 	// SERVICES
 	// ─────────────────────────────
-
-	/**
-	 * Core console abstraction (output layer).
-	 */
-	coreconsole: CoreConsoleService<TEvents, TStages, TGlobals, TModules, TTranslations>;
-
 	/**
 	 * Snapshot service (immutable runtime exposure).
 	 */
-	snapshot: SnapshotService<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	/**
+	 * Tools exposed to hooks.
+	 */
+	/**
+	 * Runtime state orchestration service.
+	 */
+	services: CoreServicesContext;
 
 	/**
 	 * Developer API service.
 	 */
-	devapi: ApiService<TEvents, TStages, TGlobals, TModules, TTranslations>;
-
 	/**
-	 * Runtime state orchestration service.
+	 * Core console abstraction (output layer).
 	 */
-	runtime: RuntimeService<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	api: CoreAPIsContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
 
-	/**
-	 * Tools exposed to hooks.
-	 */
-	tools: ToolsService<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	runtime: RuntimeManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+
 
 	// ─────────────────────────────
 	// ENGINE
@@ -162,25 +131,25 @@ export type Context<
 	/**
 	 * Core execution engine.
 	 */
-	engine: CoreEngine<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	engine: CoreEngine<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 
 	// ─────────────────────────────
 	// MANAGERS
 	// ─────────────────────────────
 
-	meta: MetaManager<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	meta: MetaManager;
 
-	bootstrap: BootstrapManager<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	bootstrap: BootstrapManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 
-	stages: StagesManager<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	stages: StagesManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 
-	i18n: I18nManager<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	i18n: I18nManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 
-	parser: ParserManager<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	parser: ParserManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 
-	globals: GlobalsManager<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	globals: GlobalsManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 
-	modules: ModulesManager<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	modules: ModulesManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 
 	// plugins?: future extension point
 };

@@ -3,6 +3,7 @@ import {
 	CoreEventKind,
 	CoreEventLevel,
 	CoreEventPhase,
+	CoreEventScope,
 	CoreEventsShape
 } from "@types";
 
@@ -21,12 +22,14 @@ export const BUILTIN_I18N_EVENTS = {
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.i18n,
+		scope: CoreEventScope.core
 	},
 	i18nMissingResolved: {
 		name: 'core.i18n.missing.resolved',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.i18n,
+		scope: CoreEventScope.core
 	},
 	// FLOW Signals
 	i18nInit: {
@@ -34,50 +37,58 @@ export const BUILTIN_I18N_EVENTS = {
 		level: CoreEventLevel.trace,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.i18n,
+		scope: CoreEventScope.core
 	},
 	i18nReady: {
 		name: 'core.i18n.ready',
 		level: CoreEventLevel.trace,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.i18n,
+		scope: CoreEventScope.core
 	},
 	// I18n Lang & Messages Resolution Fatal & Error
 	i18nMissingLang: {
 		name: 'core.i18n.missing.lang',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
-		phase: CoreEventPhase.i18n
+		phase: CoreEventPhase.i18n,
+		scope: CoreEventScope.app
 	},
 	i18nMissingBuiltinMessage: {
 		name: 'core.i18n.missing.builtin.message',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
-		phase: CoreEventPhase.i18n
+		phase: CoreEventPhase.i18n,
+		scope: CoreEventScope.app
 	},
 	i18nUnknownKeys: {
 		name: 'core.i18n.unknown.keys',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
-		phase: CoreEventPhase.i18n
+		phase: CoreEventPhase.i18n,
+		scope: CoreEventScope.app
 	},
 	// I18n warnings, issued but not blocking core to run
 	i18nMissingKeys: {
 		name: 'core.i18n.missing.keys',
 		level: CoreEventLevel.warning,
 		kind: CoreEventKind.signal,
-		phase: CoreEventPhase.i18n
+		phase: CoreEventPhase.i18n,
+		scope: CoreEventScope.app
 	},
 	i18nMissingMessageValues: {
 		name: 'core.i18n.missing.message.values',
 		level: CoreEventLevel.warning,
 		kind: CoreEventKind.signal,
-		phase: CoreEventPhase.i18n
+		phase: CoreEventPhase.i18n,
+		scope: CoreEventScope.app
 	},
 	i18nFallbackUsed: {
 		name: 'core.i18n.fallback.used',
 		level: CoreEventLevel.warning,
 		kind: CoreEventKind.signal,
-		phase: CoreEventPhase.i18n
+		phase: CoreEventPhase.i18n,
+		scope: CoreEventScope.app
 	},
 
 } as const satisfies CoreEventsShape;

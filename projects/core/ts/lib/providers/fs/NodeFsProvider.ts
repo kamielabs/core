@@ -29,6 +29,11 @@ import { FsProvider } from "@providers/fs";
  * @implements FsProvider
  */
 export class NodeFsProvider implements FsProvider {
+	private constructor() { }
+
+	public static create(): NodeFsProvider {
+		return new NodeFsProvider();
+	}
 
 	/**
 	 * Check if a file exists using Node.js fs.existsSync.

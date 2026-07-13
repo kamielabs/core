@@ -6,17 +6,13 @@ import {
 	RuntimeStageContext
 } from "@contexts";
 import {
+	CoreEventsChannelsShape,
 	CoreEventsShape,
 	CoreGlobalsShape,
 	CoreModulesShape,
 	CoreStagesShape,
 	CoreTranslationsShape,
-	RuntimeFullFacts,
-	RuntimeStateEnum,
-	RuntimeStateFromLabel,
-	RuntimeStateLabel,
-	RuntimeStateToLabel,
-	RuntimeStateTransitions,
+	RuntimeAppShape,
 } from "@types";
 
 /**
@@ -78,37 +74,7 @@ import {
  * @template TModules
  * @template TTranslations
  */
-export class RuntimeService<
-	TEvents extends CoreEventsShape,
-	TStages extends CoreStagesShape,
-	TGlobals extends CoreGlobalsShape,
-	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
-
-> {
-	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
-	private _draft?: RuntimeFullFacts | undefined;
-	private _resolved?: RuntimeFullFacts;
-	/**
-	 * Current runtime state.
-	 */
-	private _runtimeState: RuntimeStateEnum;
-
-	/**
-	 * Allowed state transitions.
-	 *
-	 * Key = current state
-	 * Value = allowed next states
-	 */
-	private _runtimeTransitions: RuntimeStateTransitions = {
-		0: [RuntimeStateEnum.bootstrap],
-		1: [RuntimeStateEnum.stage],
-		2: [RuntimeStateEnum.i18n],
-		3: [RuntimeStateEnum.globals],
-		4: [RuntimeStateEnum.module],
-		5: [RuntimeStateEnum.ready],
-		6: []
-	}
+export class RuntimeService {
 
 	/**
 	 * Constructor.
@@ -117,252 +83,14 @@ export class RuntimeService<
 	 *
 	 * @param ctx - Global execution context
 	 */
-	constructor(ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>) {
-		this._ctx = ctx;
-		this._draft = {} satisfies RuntimeFullFacts;
-		this._runtimeState = RuntimeStateEnum.init;
+	private constructor() { };
+
+	public static create(): RuntimeService {
+		return new RuntimeService();
 	}
 
 	public init: () => Promise<void> = async (): Promise<void> => { };
 
-	/**
-	 * Get current runtime state label.
-	 *
-	 * @returns string
-	 */
-	public getState(): string {
-		return RuntimeStateToLabel[this._runtimeState];
-	}
-
-	/**
-	 * Check if runtime is in a specific state.
-	 *
-	 * @param state - State label
-	 * @returns boolean
-	 */
-	public isState(state: RuntimeStateLabel): boolean {
-		return this._runtimeState === RuntimeStateFromLabel[state];
-	}
-
-	/**
-	 * Transition runtime to next state.
-	 *
-	 * Validates transition against allowed transitions map.
-	 *
-	 * @param next - Next state enum
-	 */
-	private _setState(next: RuntimeStateEnum) {
-		const currentLabel = RuntimeStateToLabel[this._runtimeState];
-		const nextLabel = RuntimeStateToLabel[next];
-
-		if (!this._runtimeTransitions[this._runtimeState].includes(next)) {
-			this._ctx.events.throw('runtimeInvalidTransition', {
-				details: [
-					`current: ${currentLabel}`,
-					`next: ${nextLabel}`
-				]
-			})
-		}
-		this._runtimeState = next;
-	}
-
-	/**
-	 * Drop the mutable runtime draft once the final runtime has been frozen.
-	 */
-	private _clearDraft() {
-		this._draft = undefined;
-	}
-
-	/**
-	 * Freeze and persist the final resolved runtime facts.
-	 *
-	 * This method is intended to run exactly once, at the end of the lifecycle.
-	 */
-	private _setResolved(state: RuntimeFullFacts): void | never {
-		if (this._resolved) {
-			this._ctx.events.throw('runtimeAlreadyResolved');
-		}
-		this._resolved = this._ctx.helpers.core.deepClone(state);
-		this._resolved = this._ctx.helpers.core.deepFreeze(this._resolved);
-	}
-
-	public getDraft(): RuntimeFullFacts {
-		if (!this._draft) {
-			this._ctx.events.throw('runtimeMissingDraft');
-		}
-		return this._draft;
-	}
-	/**
-	 * Returns resolved state.
-	 *
-	 * @throws CoreError if not resolved
-	 */
-	public getResolved(): RuntimeFullFacts {
-		if (!this._resolved) {
-			this._ctx.events.throw('runtimeMissingResolved');
-		}
-		return this._resolved;
-	}
-
-	/**
-	 * Indicates if state is resolved.
-	 */
-	public isResolved(): boolean {
-		return !!this._resolved;
-	}
-
-	/**
-	 * Initialize runtime.
-	 *
-	 * Emits:
-	 * - runtimeInit
-	 */
-	public async setInit() {
-		await this._ctx.events.emit('runtimeInit');
-	}
-
-	/**
-	 * Resolve bootstrap phase.
-	 *
-	 * Steps:
-	 * - Emit bootstrapInit
-	 * - Resolve BootstrapManager
-	 * - Update runtime draft
-	 * - Transition state
-	 * - Emit bootstrapReady
-	 */
-	public async setBootstrap() {
-		await this._ctx.events.emit('bootstrapInit');
-		await this._ctx.bootstrap.resolve();
-		this._setState(RuntimeStateEnum.bootstrap);
-		this.getDraft().bootstrap = this._ctx.bootstrap.getResolved();
-		await this._ctx.events.emit('bootstrapReady');
-	}
-
-	/**
-	 * Resolve stage phase.
-	 *
-	 * Steps:
-	 * - Emit stageInit
-	 * - Resolve StagesManager
-	 * - Update runtime draft
-	 * - Resolve i18n (dependent on stage)
-	 * - Initialize parser
-	 * - Emit stageReady
-	 */
-	public async setStage() {
-		await this._ctx.events.emit('stageInit');
-
-		await this._ctx.stages.resolve();
-
-		const stage = this._ctx.stages.getResolved();
-
-		this._setState(RuntimeStateEnum.stage);
-		this.getDraft().stage = stage;
-
-		await this._setI18n();
-		await this._setParser();
-
-		const displayStageName = this._ctx.helpers.core.getDisplayStageName(
-			stage.name,
-			this._ctx.settings.defaultStageName
-		);
-
-		await this._ctx.events.emit("stageReady", {
-			values: { stage: `${displayStageName}` }
-		});
-	}
-
-	/**
-	 * Initialize parser resolution for the current runtime cycle.
-	 *
-	 * This internal step emits `parserInit` and lets `ParserManager`
-	 * accumulate parsing state inside its own draft store.
-	 */
-	private async _setParser() {
-		await this._ctx.events.emit('parserInit');
-		await this._ctx.parser.resolve();
-	}
-
-	/**
-	 * Resolve i18n phase.
-	 *
-	 * Internal step triggered after stage resolution.
-	 *
-	 * It resolves the active language, freezes runtime i18n facts
-	 * and injects them into the runtime draft before the parser is finalized.
-	 */
-	private async _setI18n() {
-		await this._ctx.events.emit('i18nInit');
-		await this._ctx.i18n.resolve();
-		this._setState(RuntimeStateEnum.i18n);
-		const i18n = this._ctx.i18n.getResolved();
-		this.getDraft().i18n = i18n;
-		await this._ctx.events.emit('i18nReady');
-	}
-
-	/**
-	 * Resolve globals phase.
-	 *
-	 * Steps:
-	 * - Emit globalsInit
-	 * - Resolve GlobalsManager
-	 * - Update runtime draft
-	 * - Transition state
-	 * - Emit globalsReady
-	 */
-	public async setGlobals() {
-		await this._ctx.events.emit('globalsInit');
-		await this._ctx.globals.resolve();
-		this._setState(RuntimeStateEnum.globals);
-		this.getDraft().globals = this._ctx.globals.getResolved();
-		await this._ctx.events.emit('globalsReady', {
-			values: {
-				globals: JSON.stringify(this.getDraft().globals!, null, 4)
-			}
-		});
-	}
-
-	/**
-	 * Resolve module/action phase.
-	 *
-	 * Steps:
-	 * - Emit modulesInit
-	 * - Resolve ModulesManager (includes parser.resolveModule)
-	 * - Update runtime draft
-	 * - Transition state
-	 * - Emit modulesReady
-	 *
-	 * Note:
-	 * - Module and action are resolved together
-	 */
-	public async setModules() {
-		await this._ctx.events.emit('modulesInit');
-		await this._ctx.modules.resolve();
-		this._setState(RuntimeStateEnum.module);
-		this.getDraft().module = this._ctx.modules.getResolved();
-		await this._ctx.events.emit('modulesReady');
-	}
-
-	/**
-	 * Finalize runtime.
-	 *
-	 * Steps:
-	 * - Finalize parser
-	 * - Emit parserReady
-	 * - Transition to ready state
-	 * - Freeze runtime (setResolved)
-	 * - Emit runtimeReady
-	 */
-	public async setReady() {
-		this._ctx.parser.finalize();
-		await this._ctx.events.emit('parserReady');
-		this.getDraft().parser = this._ctx.parser.getResolved();
-		this._setState(RuntimeStateEnum.ready);
-		this._setResolved(this._ctx.helpers.core.deepClone(this.getDraft()));
-		this._clearDraft();
-		await this._ctx.events.emit('runtimeReady');
-	}
 
 	/**
 	 * Stage-level runtime context.
@@ -373,10 +101,19 @@ export class RuntimeService<
 	 *
 	 * This is the earliest runtime view exposed to hooks.
 	 */
-	public stageContext(): RuntimeStageContext {
+	public stageContext<
+		TEvents extends CoreEventsShape,
+		TChannels extends CoreEventsChannelsShape,
+		TStages extends CoreStagesShape,
+		TGlobals extends CoreGlobalsShape,
+		TModules extends CoreModulesShape,
+		TTranslations extends CoreTranslationsShape,
+		TApp extends RuntimeAppShape
+	>(ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>): RuntimeStageContext<TApp> {
 		return {
-			bootstrap: this._ctx.bootstrap.getResolved(),
-			stage: this._ctx.stages.getDraft()
+			bootstrap: ctx.bootstrap.getResolved(),
+			stage: ctx.stages.getDraft(),
+			app: ctx.runtime.getApp()
 		}
 	}
 
@@ -388,11 +125,20 @@ export class RuntimeService<
 	 * - stage (resolved)
 	 * - globals (draft from GlobalsManager)
 	 */
-	public globalsContext(): RuntimeGlobalsContext {
+	public globalsContext<
+		TEvents extends CoreEventsShape,
+		TChannels extends CoreEventsChannelsShape,
+		TStages extends CoreStagesShape,
+		TGlobals extends CoreGlobalsShape,
+		TModules extends CoreModulesShape,
+		TTranslations extends CoreTranslationsShape,
+		TApp extends RuntimeAppShape
+	>(ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>): RuntimeGlobalsContext<TApp> {
 		return {
-			bootstrap: this._ctx.bootstrap.getResolved(),
-			stage: this._ctx.stages.getResolved(),
-			globals: this._ctx.globals.getDraft()
+			bootstrap: ctx.bootstrap.getResolved(),
+			stage: ctx.stages.getResolved(),
+			globals: ctx.globals.getDraft(),
+			app: ctx.runtime.getApp()
 		}
 	}
 
@@ -405,13 +151,22 @@ export class RuntimeService<
 	 * - globals (resolved)
 	 * - module (draft from ModulesManager)
 	 */
-	public moduleContext(): RuntimeModuleContext {
+	public moduleContext<
+		TEvents extends CoreEventsShape,
+		TChannels extends CoreEventsChannelsShape,
+		TStages extends CoreStagesShape,
+		TGlobals extends CoreGlobalsShape,
+		TModules extends CoreModulesShape,
+		TTranslations extends CoreTranslationsShape,
+		TApp extends RuntimeAppShape
+	>(ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>): RuntimeModuleContext<TApp> {
 
 		return {
-			bootstrap: this._ctx.bootstrap.getResolved(),
-			stage: this._ctx.stages.getResolved(),
-			globals: this._ctx.globals.getResolved(),
-			module: this._ctx.modules.getDraft()
+			bootstrap: ctx.bootstrap.getResolved(),
+			stage: ctx.stages.getResolved(),
+			globals: ctx.globals.getResolved(),
+			module: ctx.modules.getDraft(),
+			app: ctx.runtime.getApp()
 		}
 	}
 
@@ -420,7 +175,15 @@ export class RuntimeService<
 	 *
 	 * Only available after ready state.
 	 */
-	public actionContext(): RuntimeFullContext {
-		return this.getResolved()
+	public actionContext<
+		TEvents extends CoreEventsShape,
+		TChannels extends CoreEventsChannelsShape,
+		TStages extends CoreStagesShape,
+		TGlobals extends CoreGlobalsShape,
+		TModules extends CoreModulesShape,
+		TTranslations extends CoreTranslationsShape,
+		TApp extends RuntimeAppShape
+	>(ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>): RuntimeFullContext<TApp> {
+		return { ...ctx.runtime.getResolved(), app: ctx.runtime.getApp() }
 	}
 }

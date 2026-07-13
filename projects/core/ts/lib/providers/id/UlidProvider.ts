@@ -26,12 +26,16 @@ import { IdProvider } from "@providers/id";
  */
 export class UlidIdProvider implements IdProvider {
 
+	private constructor() { }
+	public static create(): UlidIdProvider {
+		return new UlidIdProvider();
+	}
 	/**
 	 * Generate a ULID identifier.
 	 *
 	 * @returns string - ULID string
 	 */
-	public create(): string {
+	public generate(): string {
 		return ulid()
 	}
 }

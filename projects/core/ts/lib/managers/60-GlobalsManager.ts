@@ -9,7 +9,9 @@ import {
 	RuntimeGlobalsFacts,
 	CoreTranslationsShape,
 	ExtractGlobals,
-	RuntimeStageFacts
+	RuntimeStageFacts,
+	RuntimeAppShape,
+	CoreEventsChannelsShape
 } from "@types";
 
 
@@ -66,13 +68,15 @@ import {
  */
 export class GlobalsManager<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > {
 
-	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private _ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 	private _dict: CoreGlobalsDecl<TGlobals>;
 	private _draft?: RuntimeGlobalsFacts | undefined;
 	private _resolved?: RuntimeGlobalsFacts;
@@ -86,7 +90,7 @@ export class GlobalsManager<
 	 * - tools access
 	 * - snapshot access
 	 */
-	private _customGlobalsHook: GlobalsHook<TEvents, TStages, TGlobals, TModules, TTranslations> | undefined = undefined;
+	private _customGlobalsHook: GlobalsHook<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp> | undefined = undefined;
 
 	/**
 	 * Constructor.
@@ -98,16 +102,31 @@ export class GlobalsManager<
 	 * @param ctx - Global execution context
 	 * @param GlobalsDict - Final globals declaration
 	 */
-	constructor(
-		ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>,
-		GlobalsDict: FinalGlobals<TGlobals>
+	private constructor(
+		ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>,
+		globals: FinalGlobals<TGlobals>
 	) {
 		this._ctx = ctx;
 		this._dict = {
-			options: GlobalsDict,
+			options: globals,
 			flagIndex: { byKey: {} },
 			envIndex: { byEnv: {} }
 		} satisfies CoreGlobalsDecl<TGlobals>
+	}
+
+	public static create<
+		TEvents extends CoreEventsShape,
+		TChannels extends CoreEventsChannelsShape,
+		TStages extends CoreStagesShape,
+		TGlobals extends CoreGlobalsShape,
+		TModules extends CoreModulesShape,
+		TTranslations extends CoreTranslationsShape,
+		TApp extends RuntimeAppShape
+	>(
+		ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>,
+		globals: FinalGlobals<TGlobals>
+	): GlobalsManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp> {
+		return new GlobalsManager(ctx, globals);
 	}
 
 	public init: () => Promise<void> = async (): Promise<void> => {
@@ -228,9 +247,9 @@ export class GlobalsManager<
 		if (this._customGlobalsHook) {
 			this._customGlobalsHook({
 				options: this._draft as ExtractGlobals<TGlobals>,
-				runtime: this._ctx.runtime.globalsContext(),
-				tools: this._ctx.tools.globalsContext(),
-				snapshot: this._ctx.snapshot.snapshotContext()
+				runtime: this._ctx.services.runtime.globalsContext(this._ctx),
+				tools: this._ctx.services.tools.globalsContext(this._ctx),
+				snapshot: this._ctx.services.snapshot.snapshotContext(this._ctx)
 			})
 		}
 
@@ -474,7 +493,7 @@ export class GlobalsManager<
 	 *
 	 * @param hook - GlobalsHook implementation
 	 */
-	public customHook(hook: GlobalsHook<TEvents, TStages, TGlobals, TModules, TTranslations, ExtractGlobals<TGlobals>>) {
+	public customHook(hook: GlobalsHook<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp, ExtractGlobals<TGlobals>>) {
 		this._customGlobalsHook = hook;
 	}
 }

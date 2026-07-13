@@ -44,9 +44,6 @@ Stage:
     lang: define language to use ->
       Env: NODE_CLI_LANG
       Default value: 'en'
-    workingDir: Working directory used in stage ->
-      Env: WORKING_DIR
-      Default value: ''
 --------------------------------------------------------------------------------
 Global Options:
   Group: core
@@ -114,10 +111,6 @@ Details:
 lang: define language to use ->
   Env: NODE_CLI_LANG
   Default value: 'en'
---------------------------------------------------------------------------------
-workingDir: Working directory used in stage ->
-  Env: WORKING_DIR
-  Default value: ''
 --------------------------------------------------------------------------------`;
 
 

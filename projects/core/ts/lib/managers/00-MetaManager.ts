@@ -5,14 +5,9 @@
 // TODO: V0.1 — Add setters to allow CLI.init() to override meta (name, version, author)
 // TODO: V2.0 — Connect MetaManager to git versioning, build number, commit hash, etc.
 
-import { Context } from "@contexts";
+import { MetaManagerContext } from "@contexts";
 import {
-	CoreEventsShape,
-	CoreGlobalsShape,
 	CoreMetaShape,
-	CoreModulesShape,
-	CoreStagesShape,
-	CoreTranslationsShape
 } from "@types";
 
 
@@ -42,22 +37,16 @@ import {
  * @template TModules
  * @template TTranslations
  */
-export class MetaManager<
-	TEvents extends CoreEventsShape,
-	TStages extends CoreStagesShape,
-	TGlobals extends CoreGlobalsShape,
-	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
-> {
+export class MetaManager {
 
-	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private _ctx: MetaManagerContext;
 	private _meta: CoreMetaShape;
 
-	constructor(ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>, cliMeta?: Partial<CoreMetaShape["cli"]>) {
+	private constructor(ctx: MetaManagerContext, cliMeta?: Partial<CoreMetaShape["cli"]>) {
 		this._ctx = ctx;
 		this._meta = {
 			core: {
-				version: "0.1.0-rc.3",
+				version: "0.1.0-rc.4",
 				author: "k4mie"
 			},
 			cli: {
@@ -66,6 +55,10 @@ export class MetaManager<
 				author: cliMeta?.author
 			}
 		} satisfies CoreMetaShape;
+	}
+
+	public static create(ctx: MetaManagerContext, cliMeta?: Partial<CoreMetaShape["cli"]>) {
+		return new MetaManager(ctx, cliMeta);
 	}
 
 	public init: () => Promise<void> = async (): Promise<void> => { };

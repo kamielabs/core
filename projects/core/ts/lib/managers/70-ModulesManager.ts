@@ -34,7 +34,9 @@ import {
 	RuntimeCoreEvent,
 	UsageRoute,
 	ModuleFlagIndexEntry,
-	ActionFlagIndexEntry
+	ActionFlagIndexEntry,
+	RuntimeAppShape,
+	CoreEventsChannelsShape
 } from "@types";
 
 import { BUILTIN_MODULES, FinalModules } from "@data";
@@ -103,13 +105,15 @@ import { helpAction, versionAction } from "@data/modules";
  */
 export class ModulesManager<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > {
 
-	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private _ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 	private _dict: CoreModulesShapeDecl<TModules>;
 	private _draft?: RuntimeModuleFacts | undefined;
 	private _resolved?: RuntimeModuleFacts;
@@ -120,7 +124,7 @@ export class ModulesManager<
 	 */
 	private _builtinModuleHooks: {
 		[M in BuiltinModuleWithOptionsKey<TModules>]?: ModuleHook<
-			TEvents, TStages, TGlobals, TModules, TTranslations,
+			TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp,
 			BuiltinModuleFlags<TModules, M>
 		>
 	} = {};
@@ -130,7 +134,7 @@ export class ModulesManager<
 	 */
 	private _customModuleHooks: {
 		[M in CustomModuleWithOptionsKey<TModules>]?: ModuleHook<
-			TEvents, TStages, TGlobals, TModules, TTranslations,
+			TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp,
 			CustomModuleFlags<TModules, M>
 		>
 	} = {};
@@ -140,10 +144,12 @@ export class ModulesManager<
 	 */
 	private _beforeActionHook?: RuntimeHook<
 		TEvents,
+		TChannels,
 		TStages,
 		TGlobals,
 		TModules,
-		TTranslations
+		TTranslations,
+		TApp
 	>;
 
 	/**
@@ -151,10 +157,12 @@ export class ModulesManager<
 	 */
 	private _afterActionHook?: RuntimeHook<
 		TEvents,
+		TChannels,
 		TStages,
 		TGlobals,
 		TModules,
-		TTranslations
+		TTranslations,
+		TApp
 	>;
 
 	/**
@@ -163,7 +171,7 @@ export class ModulesManager<
 	private _builtinActionHooks: {
 		[M in BuiltinModuleKey<TModules>]?: {
 			[A in keyof BuiltinActions<TModules, M>]?: ActionHook<
-				TEvents, TStages, TGlobals, TModules, TTranslations,
+				TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp,
 				BuiltinActionFlags<TModules, M, A>
 			>
 		}
@@ -175,7 +183,7 @@ export class ModulesManager<
 	private _customActionHooks: {
 		[M in CustomModuleKey<TModules>]?: {
 			[A in keyof CustomActions<TModules, M>]?: ActionHook<
-				TEvents, TStages, TGlobals, TModules, TTranslations,
+				TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp,
 				CustomActionFlags<TModules, M, A>
 			>
 		}
@@ -192,8 +200,8 @@ export class ModulesManager<
 	 * @param ctx - Global execution context
 	 * @param modulesDict - Final modules declaration
 	 */
-	constructor(
-		ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>,
+	private constructor(
+		ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>,
 		modules: FinalModules<TModules>
 	) {
 
@@ -207,6 +215,20 @@ export class ModulesManager<
 
 	}
 
+	public static create<
+		TEvents extends CoreEventsShape,
+		TChannels extends CoreEventsChannelsShape,
+		TStages extends CoreStagesShape,
+		TGlobals extends CoreGlobalsShape,
+		TModules extends CoreModulesShape,
+		TTranslations extends CoreTranslationsShape,
+		TApp extends RuntimeAppShape
+	>(
+		ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>,
+		modules: FinalModules<TModules>
+	): ModulesManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp> {
+		return new ModulesManager(ctx, modules);
+	}
 	/**
 	 * Finalize declaration-time preparation for the modules brick.
 	 *
@@ -782,7 +804,7 @@ export class ModulesManager<
 		const hasIssues = issues.length > 0;
 		// If no warning  get out and continue
 		if (!hasIssues) return;
-		const mode = "__defaultModule__" in this._ctx.snapshot.snapshotContext().modules ? 'single' : 'modular';
+		const mode = "__defaultModule__" in this._ctx.services.snapshot.snapshotContext(this._ctx).modules ? 'single' : 'modular';
 
 		const bootstrap = this._ctx.bootstrap.getResolved();
 
@@ -865,9 +887,9 @@ export class ModulesManager<
 		}
 
 		const runtimeCtx = {
-			tools: this._ctx.tools.actionContext(),
-			runtime: this._ctx.runtime.actionContext(),
-			snapshot: this._ctx.snapshot.snapshotContext(),
+			tools: this._ctx.services.tools.actionContext(this._ctx),
+			runtime: this._ctx.services.runtime.actionContext(this._ctx),
+			snapshot: this._ctx.services.snapshot.snapshotContext(this._ctx),
 			live: {
 				events: this._ctx.events.getLive().list
 			}
@@ -902,10 +924,12 @@ export class ModulesManager<
 		module: M,
 		hook: ModuleHook<
 			TEvents,
+			TChannels,
 			TStages,
 			TGlobals,
 			TModules,
 			TTranslations,
+			TApp,
 			BuiltinModuleFlags<TModules, M>
 		>
 	) {
@@ -921,10 +945,12 @@ export class ModulesManager<
 		module: M,
 		hook: ModuleHook<
 			TEvents,
+			TChannels,
 			TStages,
 			TGlobals,
 			TModules,
 			TTranslations,
+			TApp,
 			CustomModuleFlags<TModules, M>
 		>
 	) {
@@ -941,22 +967,24 @@ export class ModulesManager<
 		module: string
 	): ModuleHook<
 		TEvents,
+		TChannels,
 		TStages,
 		TGlobals,
 		TModules,
-		TTranslations
+		TTranslations,
+		TApp
 	> | undefined {
 
 		const builtin = this._builtinModuleHooks as Partial<
 			Record<string, ModuleHook<
-				TEvents, TStages, TGlobals, TModules, TTranslations,
+				TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp,
 				Record<string, ParsedOptionValue>
 			>>
 		>;
 
 		const custom = this._customModuleHooks as Partial<
 			Record<string, ModuleHook<
-				TEvents, TStages, TGlobals, TModules, TTranslations,
+				TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp,
 				Record<string, ParsedOptionValue>
 			>>
 		>;
@@ -980,9 +1008,9 @@ export class ModulesManager<
 		await this._ctx.events.emit('modulesHooking');
 
 		await hook({
-			runtime: this._ctx.runtime.moduleContext(),
-			tools: this._ctx.tools.moduleContext(),
-			snapshot: this._ctx.snapshot.snapshotContext(),
+			runtime: this._ctx.services.runtime.moduleContext(this._ctx),
+			tools: this._ctx.services.tools.moduleContext(this._ctx),
+			snapshot: this._ctx.services.snapshot.snapshotContext(this._ctx),
 			options: runtime.moduleOptions
 		});
 	}
@@ -993,10 +1021,12 @@ export class ModulesManager<
 	public registerBeforeActionHook(
 		hook: RuntimeHook<
 			TEvents,
+			TChannels,
 			TStages,
 			TGlobals,
 			TModules,
-			TTranslations
+			TTranslations,
+			TApp
 		>
 	): void {
 		this._beforeActionHook = hook;
@@ -1008,10 +1038,12 @@ export class ModulesManager<
 	public registerAfterActionHook(
 		hook: RuntimeHook<
 			TEvents,
+			TChannels,
 			TStages,
 			TGlobals,
 			TModules,
-			TTranslations
+			TTranslations,
+			TApp
 		>
 	): void {
 		this._afterActionHook = hook;
@@ -1034,10 +1066,12 @@ export class ModulesManager<
 		action: A,
 		hook: ActionHook<
 			TEvents,
+			TChannels,
 			TStages,
 			TGlobals,
 			TModules,
 			TTranslations,
+			TApp,
 			BuiltinActionFlags<TModules, M, A>
 		>
 	) {
@@ -1059,10 +1093,12 @@ export class ModulesManager<
 		action: A,
 		hook: ActionHook<
 			TEvents,
+			TChannels,
 			TStages,
 			TGlobals,
 			TModules,
 			TTranslations,
+			TApp,
 			CustomActionFlags<TModules, M, A>
 		>
 	) {
@@ -1079,14 +1115,14 @@ export class ModulesManager<
 	public getActionHook(
 		module: string,
 		action: string
-	): RuntimeActionHook<TEvents, TStages, TGlobals, TModules, TTranslations> | undefined {
+	): RuntimeActionHook<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp> | undefined {
 
 		const builtin = this._builtinActionHooks as Partial<
-			Record<string, Record<string, RuntimeActionHook<TEvents, TStages, TGlobals, TModules, TTranslations>>>
+			Record<string, Record<string, RuntimeActionHook<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>>>
 		>;
 
 		const custom = this._customActionHooks as Partial<
-			Record<string, Record<string, RuntimeActionHook<TEvents, TStages, TGlobals, TModules, TTranslations>>>
+			Record<string, Record<string, RuntimeActionHook<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>>>
 		>;
 
 		return (

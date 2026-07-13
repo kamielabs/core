@@ -9,23 +9,27 @@
 // - No direct mutation of runtime state is allowed
 
 import {
+	CoreEventsChannelsShape,
 	CoreEventsShape,
 	CoreGlobalsShape,
 	CoreModulesShape,
 	CoreStagesShape,
 	CoreTranslationsShape,
 	ParsedOptionValue,
+	RuntimeAppShape,
 	RuntimeCoreFacts,
 	RuntimeGlobalsFacts,
 	RuntimeModuleFacts,
 	RuntimeStageFacts
 } from "@types";
 import {
+	GetFilteredEventsMethod,
 	MessageDebugHookMethod,
 	MessageInfoHookMethod,
 	MessageThrowHookMethod,
 	MessageTraceHookMethod,
 	MessageWarnHookMethod,
+	ResolvePathHelperMethod,
 	SignalDebugHookMethod,
 	SignalInfoHookMethod,
 	SignalThrowHookMethod,
@@ -44,12 +48,14 @@ import { ModulesManager } from "@managers";
  */
 export type ModulesHookMethod<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > =
-	ModulesManager<TEvents, TStages, TGlobals, TModules, TTranslations>["registerCustomModuleHook"];
+	ModulesManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>["registerCustomModuleHook"];
 
 /**
  * ToolsModuleContext
@@ -60,31 +66,39 @@ export type ModulesHookMethod<
  */
 export type ToolsModuleContext<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > = {
 	/**
 	 * Emit a signal event.
 	 */
 	signal: {
-		trace: SignalTraceHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		debug: SignalDebugHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		info: SignalInfoHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		warn: SignalWarnHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		throw: SignalThrowHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		trace: SignalTraceHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		debug: SignalDebugHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		info: SignalInfoHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		warn: SignalWarnHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		throw: SignalThrowHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 	},
 
 	/**
 	 * Emit a user-facing message.
 	 */
 	message: {
-		trace: MessageTraceHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		debug: MessageDebugHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		info: MessageInfoHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		warn: MessageWarnHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		throw: MessageThrowHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		trace: MessageTraceHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		debug: MessageDebugHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		info: MessageInfoHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		warn: MessageWarnHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		throw: MessageThrowHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+	};
+	events: {
+		get: GetFilteredEventsMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+	};
+	paths: {
+		resolve: ResolvePathHelperMethod;
 	}
 }
 
@@ -99,11 +113,12 @@ export type ToolsModuleContext<
  * - globals facts
  * - current module facts
  */
-export type RuntimeModuleContext = {
+export type RuntimeModuleContext<TApp extends RuntimeAppShape> = {
 	bootstrap: RuntimeCoreFacts;
 	stage: RuntimeStageFacts;
 	globals: RuntimeGlobalsFacts;
 	module: RuntimeModuleFacts;
+	app: TApp;
 }
 
 /**
@@ -125,10 +140,12 @@ export type RuntimeModuleContext = {
  */
 export type ModuleHook<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape,
 	TOptions = Record<string, ParsedOptionValue>
 > = (ctx: {
 	/**
@@ -139,15 +156,15 @@ export type ModuleHook<
 	/**
 	 * Controlled tools for side-effects.
 	 */
-	tools?: ToolsModuleContext<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	tools?: ToolsModuleContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 
 	/**
 	 * Runtime facts (read-only).
 	 */
-	runtime?: RuntimeModuleContext;
+	runtime?: RuntimeModuleContext<TApp>;
 
 	/**
 	 * Full system snapshot.
 	 */
-	snapshot?: SnapshotFullContext<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	snapshot?: SnapshotFullContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations>;
 }) => void | Promise<void>;

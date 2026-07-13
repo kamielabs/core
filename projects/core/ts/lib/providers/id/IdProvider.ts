@@ -29,5 +29,5 @@ export interface IdProvider {
 	 *
 	 * @returns string - Unique ID
 	 */
-	create(): string
+	generate(): string
 }

@@ -11,7 +11,13 @@ import {
 	CoreTranslationsShape,
 	RuntimeCoreEvent,
 	CoreConsoleSettings,
-	CoreEventLevelLabel
+	CoreEventLevelLabel,
+	RuntimeAppShape,
+	EventOutputListenerContext,
+	CoreEventOrigin,
+	CoreEventScopeLabel,
+	CoreEventScope,
+	CoreEventsChannelsShape
 } from "@types";
 
 /**
@@ -77,17 +83,20 @@ import {
  */
 export class CoreConsoleService<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > {
 
-	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private _ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 	/**
 	 * Minimum event level required for display.
 	 */
 	private _displayLevel: CoreEventLevel;
+	private _displayScope: CoreEventScope;
 	private _settings: CoreConsoleSettings;
 
 	/**
@@ -97,13 +106,27 @@ export class CoreConsoleService<
 	 *
 	 * @param ctx - Global execution context
 	 */
-	constructor(ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>) {
+	private constructor(ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>) {
 		this._ctx = ctx;
-		// this.print = this.print.bind(this);
-		this._ctx.events.registerSystemListener("*", { handler: this.print, channel: "default" });
 
 		this._settings = this._ctx.settings.console!;
 		this._displayLevel = CoreEventLevelLabel[this._settings.level!]
+		this._displayScope = CoreEventScopeLabel[this._settings.scope!]
+		this._ctx.events.registerSystemListener("*", { handler: this.printEvent, channel: "default", level: this._displayLevel, scope: this._displayScope });
+	}
+
+	public static create<
+		TEvents extends CoreEventsShape,
+		TChannels extends CoreEventsChannelsShape,
+		TStages extends CoreStagesShape,
+		TGlobals extends CoreGlobalsShape,
+		TModules extends CoreModulesShape,
+		TTranslations extends CoreTranslationsShape,
+		TApp extends RuntimeAppShape
+	>(
+		ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
+	): CoreConsoleService<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp> {
+		return new CoreConsoleService<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>(ctx);
 	}
 
 	public init: () => Promise<void> = async (): Promise<void> => { };
@@ -130,14 +153,36 @@ export class CoreConsoleService<
 	 */
 	private _formatBase(event: RuntimeCoreEvent<string>, withName?: boolean): string {
 		const time = this._settings.showTS ? `[${this._formatTimestamp(event.ts)}] ` : "";
+		const origin = this._formatOrigin(event.origin);
+		const scope = this._formatScope(event.scope);
 		const level = this._settings.showLevel ? `${this._pad(CoreEventLevel[event.level].toUpperCase(), 7)} ` : "";
 		const phase = this._settings.showPhase ? `${this._pad(CoreEventPhase[event.phase].toUpperCase(), 10)} ` : "";
 
 
-		if (withName && withName === true) return `${time}${level}${phase}${event.name}`;
-		return `${time}${level}${phase}`
+		if (withName && withName === true) return `${time}${scope}${origin}${level}${phase}${event.name}`;
+		return `${time}${scope}${origin}${level}${phase}`
+	}
+	private _formatOrigin(origin: CoreEventOrigin): string {
+		if (!this._settings.showOrigin) {
+			return "";
+		}
+
+		return `${this._pad(
+			CoreEventOrigin[origin].toUpperCase(),
+			5,
+		)} `;
 	}
 
+	private _formatScope(scope: CoreEventScope): string {
+		if (!this._settings.showScope) {
+			return "";
+		}
+
+		return `${this._pad(
+			CoreEventScope[scope].toUpperCase(),
+			5,
+		)} `;
+	}
 	/**
 	 * Format signal event.
 	 *
@@ -196,25 +241,19 @@ export class CoreConsoleService<
 
 		switch (event.level) {
 			case CoreEventLevel.trace:
-				this._printSignalTrace(event);
-				break;
+				return this._formatSignal(event);
 			case CoreEventLevel.debug:
-				this._printSignalDebug(event);
-				break;
+				return this._formatSignal(event);
 			case CoreEventLevel.info:
-				this._printSignalInfo(event);
-				break;
+				return this._formatSignal(event);
 			case CoreEventLevel.warning:
-				this._printSignalWarning(event);
-				break;
+				return `\x1b[33m${this._formatSignal(event)}\x1b[0m`;
 			case CoreEventLevel.error:
-				this._printSignalError(event);
-				break;
+				return `\x1b[31m${this._formatSignal(event)}\x1b[0m`;
 			case CoreEventLevel.fatal:
-				this._printSignalFatal(event);
-				break;
+				return `\x1b[41m\x1b[37m${this._formatSignal(event)}\x1b[0m`;
 			default:
-				return
+				return;
 		}
 	}
 
@@ -223,90 +262,35 @@ export class CoreConsoleService<
 	 *
 	 * Performs translation before formatting.
 	 */
-	private async _printMessage(event: RuntimeCoreEvent<string>) {
+	private async _printMessage(
+		event: RuntimeCoreEvent<string>,
+		ctx: EventOutputListenerContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
+	): Promise<string | undefined> {
 		if (event.kind !== CoreEventKind.message) return;
 
-		const msg = await this._ctx.i18n.tr(event.name, event.values);
+		const msg = await ctx.translate(event.name, event.values);
 
 		switch (event.level) {
 			case CoreEventLevel.trace:
-				this._printMessageTrace(event, msg);
-				break;
+				return this._formatMessage(event, msg);
 			case CoreEventLevel.debug:
-				this._printMessageDebug(event, msg);
-				break;
+				return this._formatMessage(event, msg);
 			case CoreEventLevel.info:
-				this._printMessageInfo(event, msg);
-				break;
+				return this._formatMessage(event, msg);
 			case CoreEventLevel.warning:
-				this._printMessageWarning(event, msg);
-				break;
+				return `\x1b[33m${this._formatMessage(event, msg)}\x1b[0m`;
 			case CoreEventLevel.error:
-				this._printMessageError(event, msg);
-				break;
+				return `\x1b[31m${this._formatMessage(event, msg)}\x1b[0m`;
 			case CoreEventLevel.fatal:
-				this._printMessageFatal(event, msg);
-				break;
+				return `\x1b[41m\x1b[37m${this._formatMessage(event, msg)}\x1b[0m`;
 			default:
 				return;
 		}
 	}
 
-	// -----------------------------------------------------
-	// SIGNAL PRINT METHODS
-	// -----------------------------------------------------
-
-	private _printSignalTrace(event: RuntimeCoreEvent<string>) {
-		console.debug(this._formatSignal(event));
-	}
-
-	private _printSignalDebug(event: RuntimeCoreEvent<string>) {
-		console.debug(this._formatSignal(event));
-	}
-
-	private _printSignalInfo(event: RuntimeCoreEvent<string>) {
-		console.info(this._formatSignal(event));
-	}
-
-	private _printSignalWarning(event: RuntimeCoreEvent<string>) {
-		console.warn(`\x1b[33m${this._formatSignal(event)}\x1b[0m`);
-	}
-
-	private _printSignalError(event: RuntimeCoreEvent<string>) {
-		console.error(`\x1b[31m${this._formatSignal(event)}\x1b[0m`);
-	}
-
-	private _printSignalFatal(event: RuntimeCoreEvent<string>) {
-		console.error(`\x1b[41m\x1b[37m${this._formatSignal(event)}\x1b[0m`);
-	}
-
-	// -----------------------------------------------------
-	// MESSAGE PRINT METHODS
-	// -----------------------------------------------------
-
-	private _printMessageTrace(event: RuntimeCoreEvent<string>, msg: CoreMessage<string>) {
-		console.debug(this._formatMessage(event, msg));
-	}
-
-	private _printMessageDebug(event: RuntimeCoreEvent<string>, msg: CoreMessage<string>) {
-		console.debug(this._formatMessage(event, msg));
-	}
-
-	private _printMessageInfo(event: RuntimeCoreEvent<string>, msg: CoreMessage<string>) {
-		console.info(this._formatMessage(event, msg));
-	}
-
-	private _printMessageWarning(event: RuntimeCoreEvent<string>, msg: CoreMessage<string>) {
-		console.warn(`\x1b[33m${this._formatMessage(event, msg)}\x1b[0m`);
-	}
-
-	private _printMessageError(event: RuntimeCoreEvent<string>, msg: CoreMessage<string>) {
-		console.error(`\x1b[31m${this._formatMessage(event, msg)}\x1b[0m`);
-	}
-
-	private _printMessageFatal(event: RuntimeCoreEvent<string>, msg: CoreMessage<string>) {
-		console.error(`\x1b[41m\x1b[37m${this._formatMessage(event, msg)}\x1b[0m`);
-	}
+	// private _shouldPrintScope(scope: CoreEventScope): boolean {
+	// 	return scope >= this._displayScope;
+	// }
 
 	/**
 	 * Raw output placeholder.
@@ -324,22 +308,25 @@ export class CoreConsoleService<
 	 *
 	 * @param event - Runtime event
 	 */
-	public print: (event: RuntimeCoreEvent<string>) => Promise<void> =
-		async (event: RuntimeCoreEvent<string>) => {
-			if (!event) {
-				return;
-			}
-
-			if (event.level < this._displayLevel) {
-				return;
-			}
-
-			if (event.kind === CoreEventKind.signal) {
-				await this._printSignal(event);
-				return;
-			} else if (event.kind === CoreEventKind.message) {
-				await this._printMessage(event);
-				return;
-			}
+	public printEvent: (
+		event: RuntimeCoreEvent<string>,
+		ctx: { translate: (name: string, values?: Record<string, string>) => Promise<CoreMessage<string>> }
+	) => Promise<string | undefined> = async (event: RuntimeCoreEvent<string>, ctx) => {
+		if (!event) {
+			return;
 		}
+		// if (!this._shouldPrintScope(event.scope)) {
+		// 	return;
+		// }
+
+		// if (event.level < this._displayLevel) {
+		// 	return;
+		// }
+
+		if (event.kind === CoreEventKind.signal) {
+			return await this._printSignal(event);
+		} else if (event.kind === CoreEventKind.message) {
+			return await this._printMessage(event, ctx);
+		}
+	}
 }

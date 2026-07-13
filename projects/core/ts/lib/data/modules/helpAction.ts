@@ -4,7 +4,9 @@ import {
 	CoreModulesShape,
 	CoreStagesShape,
 	CoreTranslationsShape,
-	BuiltinActionFlags
+	BuiltinActionFlags,
+	RuntimeAppShape,
+	CoreEventsChannelsShape
 } from "@types";
 
 import { ActionHook } from "@contexts";
@@ -26,11 +28,13 @@ import {
 
 export const helpAction = <
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
->(): ActionHook<TEvents, TStages, TGlobals, TModules, TTranslations, BuiltinActionFlags<TModules, 'help', "__defaultAction__">> => {
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
+>(): ActionHook<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp, BuiltinActionFlags<TModules, 'help', "__defaultAction__">> => {
 
 	return async ({ options, args, snapshot, runtime }) => {
 		const ignored = [...args];
