@@ -152,7 +152,7 @@ export class ToolsService {
 			},
 			events: {
 				get: (filter) => ctx.events.getFilteredEvents(filter),
-				addListener: (handler) => ctx.events.setOutputListener(handler),
+				addListener: (handler, options) => ctx.events.setOutputListener(handler, options),
 			},
 			paths: {
 				resolve: (input, options) => ctx.helpers.core.resolvePath(input, options)
