@@ -2,9 +2,11 @@ export {
 	CoreEventKind,
 	CoreEventPhase,
 	CoreEventLevel,
+	CoreEventScope,
 	CoreEventKindLabel,
 	CoreEventPhaseLabel,
-	CoreEventLevelLabel
+	CoreEventLevelLabel,
+	CoreEventScopeLabel
 } from "@types";
 export type {
 	GlobalOption,
