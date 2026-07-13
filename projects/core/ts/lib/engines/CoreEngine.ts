@@ -12,11 +12,13 @@
 // TODO: V2.0 — Make engines fully generic with global core shape
 
 import {
+	CoreEventsChannelsShape,
 	CoreEventsShape,
 	CoreGlobalsShape,
 	CoreModulesShape,
 	CoreStagesShape,
-	CoreTranslationsShape
+	CoreTranslationsShape,
+	RuntimeAppShape
 } from "@types";
 import { Context } from "@contexts";
 import { BUILTIN_ENGINES } from "@data";
@@ -62,18 +64,20 @@ import { FedEngine } from "./FedEngine";
  */
 export class CoreEngine<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > {
 
-	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private _ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 	/**
 	 * Selected engine instance.
 	 */
-	private engine!: StandardEngine<TEvents, TStages, TGlobals, TModules, TTranslations>
-		| FedEngine<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private engine!: StandardEngine<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
+		| FedEngine<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 
 	/**
 	 * Execution runner resolved from ModulesManager.
@@ -83,8 +87,22 @@ export class CoreEngine<
 	 */
 	private runner!: () => Promise<void> | void;
 
-	constructor(ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>) {
+	private constructor(ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>) {
 		this._ctx = ctx;
+	}
+
+	public static create<
+		TEvents extends CoreEventsShape,
+		TChannels extends CoreEventsChannelsShape,
+		TStages extends CoreStagesShape,
+		TGlobals extends CoreGlobalsShape,
+		TModules extends CoreModulesShape,
+		TTranslations extends CoreTranslationsShape,
+		TApp extends RuntimeAppShape
+	>(
+		ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>,
+	): CoreEngine<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp> {
+		return new CoreEngine(ctx);
 	}
 
 	/**

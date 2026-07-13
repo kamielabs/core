@@ -1,4 +1,6 @@
-import { FinalEvents } from "@data";
+import { I18nTrMethod } from "@contexts";
+import { FinalEvents, FinalEventsChannels } from "@data";
+import { CoreStagesShape, CoreGlobalsShape, CoreModulesShape, CoreTranslationsShape, RuntimeAppShape } from "@types";
 
 /**
  * Declarative event kind.
@@ -40,9 +42,21 @@ export enum CoreEventLevel {
 	fatal
 }
 
+export enum CoreEventScope {
+	core,
+	app
+}
+
+export enum CoreEventOrigin {
+	core,
+	app
+}
+
 export type EventKindRecords = Record<string, CoreEventKind>;
 export type EventPhaseRecords = Record<string, CoreEventPhase>;
 export type EventLevelRecords = Record<string, CoreEventLevel>;
+export type EventScopeRecords = Record<string, CoreEventScope>;
+export type EventOriginRecords = Record<string, CoreEventOrigin>;
 
 /**
  * String-to-enum lookup for event kinds.
@@ -79,6 +93,16 @@ export const CoreEventLevelLabel = {
 	fatal: CoreEventLevel.fatal,
 } as const satisfies EventLevelRecords;
 
+export const CoreEventScopeLabel = {
+	core: CoreEventScope.core,
+	app: CoreEventScope.app
+} as const satisfies EventScopeRecords;
+
+export const CoreEventOriginLabel = {
+	core: CoreEventOrigin.core,
+	app: CoreEventOrigin.app
+} as const satisfies EventOriginRecords;
+
 /* -------------------------------------------------------------------------- */
 /* Declarative events                                                         */
 /* -------------------------------------------------------------------------- */
@@ -97,12 +121,14 @@ export type CoreEventBase<
 	Name extends string,
 	Kind extends CoreEventKind,
 	Level extends CoreEventLevel,
-	Phase extends CoreEventPhase
+	Phase extends CoreEventPhase,
+	Scope extends CoreEventScope
 > = {
 	name: Name;
 	kind: Kind;
 	level: Level;
 	phase: Phase;
+	scope: Scope;
 	label?: string;
 	trigger?: boolean;
 };
@@ -116,7 +142,7 @@ export type CoreEventBase<
  */
 export type CoreEvent<
 	Name extends string,
-> = CoreEventBase<Name, CoreEventKind, CoreEventLevel, CoreEventPhase>;
+> = CoreEventBase<Name, CoreEventKind, CoreEventLevel, CoreEventPhase, CoreEventScope>;
 
 /**
  * Generic event dictionary shape.
@@ -140,6 +166,15 @@ export type CoreEventsShapeDecl<TEvents extends CoreEventsShape> = {
 	}
 }
 
+
+export type CoreEventsChannel = {
+	description?: string;
+}
+
+export type CoreEventsChannelsShape = {
+	[C in string]: CoreEventsChannel
+}
+
 /* -------------------------------------------------------------------------- */
 /* Runtime events                                                             */
 /* -------------------------------------------------------------------------- */
@@ -151,9 +186,10 @@ export type CoreEventsShapeDecl<TEvents extends CoreEventsShape> = {
  */
 export type RuntimeCoreSignalEvent<
 	Name extends string,
-> = CoreEventBase<Name, CoreEventKind.signal, CoreEventLevel, CoreEventPhase> & {
+> = CoreEventBase<Name, CoreEventKind.signal, CoreEventLevel, CoreEventPhase, CoreEventScope> & {
 	id: string;
 	ts: number;
+	origin: CoreEventOrigin;
 	details?: string[];
 	values?: never;
 };
@@ -165,9 +201,10 @@ export type RuntimeCoreSignalEvent<
  */
 export type RuntimeCoreMessageEvent<
 	Name extends string,
-> = CoreEventBase<Name, CoreEventKind.message, CoreEventLevel, CoreEventPhase> & {
+> = CoreEventBase<Name, CoreEventKind.message, CoreEventLevel, CoreEventPhase, CoreEventScope> & {
 	id: string;
 	ts: number;
+	origin: CoreEventOrigin;
 	values?: Record<string, string>;
 	details?: never;
 };
@@ -357,23 +394,28 @@ export type EventSelector<TEvents extends CoreEventsShape> =
 	| "*";
 
 /**
- * Shared listener base contract.
- *
- * Every listener receives the emitted runtime event instance.
- */
-export type EventListenerBase = {
-	handler: (event: RuntimeCoreEvent<string>) => Promise<void> | void;
-};
-
-/**
  * Listener shape dedicated to FED flow orchestration.
  *
  * Flow listeners never carry a channel because channels are reserved for
  * passive output dispatch only.
  */
-export type EventFlowListener = EventListenerBase & {
+export type EventFlowListener = {
+	handler: (event: RuntimeCoreEvent<string>) => Promise<void> | void;
 	channel?: never;
 };
+
+export type EventOutputListenerContext<
+	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
+	TStages extends CoreStagesShape,
+	TGlobals extends CoreGlobalsShape,
+	TModules extends CoreModulesShape,
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
+
+> = {
+	translate: I18nTrMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
+}
 
 /**
  * Listener shape dedicated to passive output dispatch.
@@ -381,8 +423,23 @@ export type EventFlowListener = EventListenerBase & {
  * `channel` is used by the event dispatcher to isolate output streams and to
  * let runtime listeners override system listeners on the same channel.
  */
-export type EventOutputListener = EventListenerBase & {
-	channel?: string;
+export type EventOutputListener<
+	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
+	TStages extends CoreStagesShape,
+	TGlobals extends CoreGlobalsShape,
+	TModules extends CoreModulesShape,
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
+
+> = {
+	handler: (
+		event: RuntimeCoreEvent<string>,
+		ctx: EventOutputListenerContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
+	) => Promise<string | undefined> | string | undefined;
+	channel?: keyof FinalEventsChannels<TChannels> & string;
+	level?: CoreEventLevel;
+	scope?: CoreEventScope;
 };
 
 /**
@@ -391,4 +448,13 @@ export type EventOutputListener = EventListenerBase & {
  * Concrete registration APIs narrow this union depending on whether they deal
  * with flow listeners or passive output listeners.
  */
-export type EventListener = EventFlowListener | EventOutputListener
+export type EventListener<
+	TEvents extends CoreEventsShape = {},
+	TChannels extends CoreEventsChannelsShape = {},
+	TStages extends CoreStagesShape = {},
+	TGlobals extends CoreGlobalsShape = {},
+	TModules extends CoreModulesShape = {},
+	TTranslations extends CoreTranslationsShape = {},
+	TApp extends RuntimeAppShape = {}
+
+> = EventFlowListener | EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>

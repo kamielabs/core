@@ -3,11 +3,13 @@ import {
 	SnapshotFullContext
 } from "@contexts";
 import {
+	CoreEventsChannelsShape,
 	CoreEventsShape,
 	CoreGlobalsShape,
 	CoreModulesShape,
 	CoreStagesShape,
 	CoreTranslationsShape,
+	RuntimeAppShape,
 } from "@types";
 
 /**
@@ -57,25 +59,18 @@ import {
  * @template TModules
  * @template TTranslations
  */
-export class SnapshotService<
-	TEvents extends CoreEventsShape,
-	TStages extends CoreStagesShape,
-	TGlobals extends CoreGlobalsShape,
-	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
-> {
+export class SnapshotService {
 
-	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
 	/**
 	 * Constructor.
 	 *
-	 * @param ctx - Global execution context
 	 */
-	constructor(ctx: Context<
-		TEvents, TStages, TGlobals, TModules, TTranslations
-	>) {
-		this._ctx = ctx;
+	private constructor() { }
+
+	public static create(): SnapshotService {
+		return new SnapshotService();
 	}
+
 
 	public init: () => Promise<void> = async (): Promise<void> => { };
 	/**
@@ -88,16 +83,27 @@ export class SnapshotService<
 	 *
 	 * @returns SnapshotFullContext
 	 */
-	public snapshotContext(): SnapshotFullContext<TEvents, TStages, TGlobals, TModules, TTranslations> {
+	public snapshotContext<
+		TEvents extends CoreEventsShape,
+		TChannels extends CoreEventsChannelsShape,
+		TStages extends CoreStagesShape,
+		TGlobals extends CoreGlobalsShape,
+		TModules extends CoreModulesShape,
+		TTranslations extends CoreTranslationsShape,
+		TApp extends RuntimeAppShape
+	>(
+		ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
+	): SnapshotFullContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations> {
 
-		const snap: SnapshotFullContext<TEvents, TStages, TGlobals, TModules, TTranslations> = {
-			meta: this._ctx.meta.getMeta(),
-			settings: this._ctx.settings,
-			events: this._ctx.events.getDict(),
-			stages: this._ctx.stages.getDict(),
-			i18n: this._ctx.i18n.getDict(),
-			globals: this._ctx.globals.getDict(),
-			modules: this._ctx.modules.getDict(),
+		const snap: SnapshotFullContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations> = {
+			meta: ctx.meta.getMeta(),
+			settings: ctx.settings,
+			events: ctx.events.getDict(),
+			channels: ctx.events.getChannels(),
+			stages: ctx.stages.getDict(),
+			i18n: ctx.i18n.getDict(),
+			globals: ctx.globals.getDict(),
+			modules: ctx.modules.getDict(),
 		}
 
 		return snap

@@ -12,12 +12,14 @@ import {
 	GlobalsManager
 } from "@managers";
 import {
+	CoreEventsChannelsShape,
 	CoreEventsShape,
 	CoreGlobalsShape,
 	CoreModulesShape,
 	CoreStagesShape,
 	CoreTranslationsShape,
 	ExtractGlobals,
+	RuntimeAppShape,
 	RuntimeCoreFacts,
 	RuntimeGlobalsFacts,
 	RuntimeStageFacts
@@ -34,7 +36,9 @@ import {
 	MessageDebugHookMethod,
 	MessageInfoHookMethod,
 	MessageWarnHookMethod,
-	MessageThrowHookMethod
+	MessageThrowHookMethod,
+	ResolvePathHelperMethod,
+	GetFilteredEventsMethod
 } from "@contexts";
 
 /**
@@ -46,11 +50,13 @@ import {
  */
 export type GlobalsHookMethod<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
-> = GlobalsManager<TEvents, TStages, TGlobals, TModules, TTranslations>["customHook"]
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
+> = GlobalsManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>["customHook"]
 
 /**
  * RuntimeGlobalsContext
@@ -62,7 +68,7 @@ export type GlobalsHookMethod<
  * - current stage facts
  * - resolved globals facts
  */
-export type RuntimeGlobalsContext = {
+export type RuntimeGlobalsContext<TApp extends RuntimeAppShape> = {
 	/**
 	 * Core bootstrap facts (platform, env, etc.)
 	 */
@@ -77,6 +83,8 @@ export type RuntimeGlobalsContext = {
 	 * Current resolved globals facts
 	 */
 	globals: RuntimeGlobalsFacts;
+
+	app: TApp;
 };
 
 /**
@@ -88,31 +96,33 @@ export type RuntimeGlobalsContext = {
  */
 export type ToolsGlobalsContext<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > = {
 
 	/*
 	 * Emit a signal event.
 	 */
 	signal: {
-		trace: SignalTraceHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		debug: SignalDebugHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		info: SignalInfoHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		warn: SignalWarnHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		throw: SignalThrowHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		trace: SignalTraceHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		debug: SignalDebugHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		info: SignalInfoHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		warn: SignalWarnHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		throw: SignalThrowHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 	};
 	/**
 	 * Emit a user-facing message.
 	 */
 	message: {
-		trace: MessageTraceHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		debug: MessageDebugHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		info: MessageInfoHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		warn: MessageWarnHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
-		throw: MessageThrowHookMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		trace: MessageTraceHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		debug: MessageDebugHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		info: MessageInfoHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		warn: MessageWarnHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		throw: MessageThrowHookMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 	};
 	/**
 	 * Register an output listener.
@@ -121,7 +131,13 @@ export type ToolsGlobalsContext<
 	 * - Impacts global output behavior
 	 * - Registers passive output listeners only, never flow listeners
 	 */
-	addListener: SetOutputListenerMethod<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	events: {
+		get: GetFilteredEventsMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+		addListener: SetOutputListenerMethod<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
+	};
+	paths: {
+		resolve: ResolvePathHelperMethod;
+	}
 }
 
 /**
@@ -137,10 +153,12 @@ export type ToolsGlobalsContext<
  */
 export type GlobalsHookContext<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape,
 	TGlobalOptions = ExtractGlobals<TGlobals>
 > = {
 	/**
@@ -151,17 +169,17 @@ export type GlobalsHookContext<
 	/**
 	 * Runtime facts (read-only).
 	 */
-	runtime: RuntimeGlobalsContext;
+	runtime: RuntimeGlobalsContext<TApp>;
 
 	/**
 	 * Controlled tools for side-effects.
 	 */
-	tools: ToolsGlobalsContext<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	tools: ToolsGlobalsContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 
 	/**
 	 * Full system snapshot.
 	 */
-	snapshot: SnapshotFullContext<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	snapshot: SnapshotFullContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations>;
 };
 
 /**
@@ -182,18 +200,22 @@ export type GlobalsHookContext<
  */
 export type GlobalsHook<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape,
 	TGlobalOtions = ExtractGlobals<TGlobals>
 > = (
 	ctx: GlobalsHookContext<
 		TEvents,
+		TChannels,
 		TStages,
 		TGlobals,
 		TModules,
 		TTranslations,
+		TApp,
 		TGlobalOtions
 	>
 ) => void | Promise<void>;

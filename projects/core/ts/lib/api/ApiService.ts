@@ -1,9 +1,11 @@
 import {
+	CoreEventsChannelsShape,
 	CoreEventsShape,
 	CoreGlobalsShape,
 	CoreModulesShape,
 	CoreStagesShape,
 	CoreTranslationsShape,
+	RuntimeAppShape,
 } from "@types";
 
 import {
@@ -63,21 +65,37 @@ import {
  */
 export class ApiService<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 
 > {
 
-	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private _ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 	/**
 	 * Constructor.
 	 *
 	 * @param ctx - Global execution context
 	 */
-	constructor(ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>) {
+	private constructor(ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>) {
 		this._ctx = ctx;
+	}
+
+	public static create<
+		TEvents extends CoreEventsShape,
+		TChannels extends CoreEventsChannelsShape,
+		TStages extends CoreStagesShape,
+		TGlobals extends CoreGlobalsShape,
+		TModules extends CoreModulesShape,
+		TTranslations extends CoreTranslationsShape,
+		TApp extends RuntimeAppShape
+	>(
+		ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
+	): ApiService<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp> {
+		return new ApiService<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>(ctx);
 	}
 
 	public init: () => Promise<void> = async (): Promise<void> => { };
@@ -94,7 +112,7 @@ export class ApiService<
 	 * @param defaults - Default stage overrides
 	 */
 	public setBuiltinStageDefaults: StagesDefaultHookMethod<
-		TEvents, TStages, TGlobals, TModules, TTranslations
+		TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp
 	> = (defaults) => {
 		return this._ctx.stages.overrideDefaultStage(defaults);
 	};
@@ -108,7 +126,7 @@ export class ApiService<
 	 * @param hook - Hook function
 	 */
 	public onBuiltinStage: StagesBuiltinHookMethod<
-		TEvents, TStages, TGlobals, TModules, TTranslations
+		TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp
 	> = (stage, hook) => {
 		return this._ctx.stages.registerBuiltinStageHook(stage, hook);
 	}
@@ -122,7 +140,7 @@ export class ApiService<
 	 * @param hook - Hook function
 	 */
 	public onCustomStage: StagesCustomHookMethod<
-		TEvents, TStages, TGlobals, TModules, TTranslations
+		TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp
 	> = (stage, hook) => {
 		return this._ctx.stages.registerCustomStageHook(stage, hook);
 	}
@@ -139,7 +157,7 @@ export class ApiService<
 	 * @param hook - Globals hook
 	 */
 	public onGlobals: GlobalsHookMethod<
-		TEvents, TStages, TGlobals, TModules, TTranslations
+		TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp
 	> = (hook) => {
 		return this._ctx.globals.customHook(hook);
 	}
@@ -157,21 +175,21 @@ export class ApiService<
 	 * @param hook - Module hook
 	 */
 	public onModule: ModulesHookMethod<
-		TEvents, TStages, TGlobals, TModules, TTranslations
+		TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp
 	> = (module, hook) => {
 		return this._ctx.modules.registerCustomModuleHook(module, hook);
 	};
 
 
 	public onBeforeAction: BeforeActionHookMethod<
-		TEvents, TStages, TGlobals, TModules, TTranslations
+		TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp
 	> = (hook) => {
 		return this._ctx.modules.registerBeforeActionHook(hook)
 	};
 
 
 	public onAfterAction: AfterActionHookMethod<
-		TEvents, TStages, TGlobals, TModules, TTranslations
+		TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp
 	> = (hook) => {
 		return this._ctx.modules.registerAfterActionHook(hook)
 	};
@@ -185,7 +203,7 @@ export class ApiService<
 	 * @param hook - Action hook
 	 */
 	public onModuleAction: ModulesActionHookMethod<
-		TEvents, TStages, TGlobals, TModules, TTranslations
+		TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp
 	> = (module, action, hook) => {
 		return this._ctx.modules.registerCustomActionHook(module, action, hook);
 	};

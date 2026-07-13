@@ -1,4 +1,4 @@
-import { CoreEngineName, FinalGlobals, FinalModules, FinalStages, FinalTranslations } from "@data";
+import { CoreEngineName, FinalEventsChannels, FinalGlobals, FinalModules, FinalStages, FinalTranslations } from "@data";
 import {
 	CoreEventsShape,
 	CoreStagesShape,
@@ -9,7 +9,10 @@ import {
 	CoreTranslationsShape,
 	CoreEventLevelLabel,
 	CoreMetaShape,
-	CoreEventsShapeDecl
+	CoreEventsShapeDecl,
+	RuntimeAppShape,
+	CoreEventScopeLabel,
+	CoreEventsChannelsShape
 } from "@types";
 
 /**
@@ -34,6 +37,9 @@ export interface ParsedCliContextResult {
 
 export type CoreConsoleSettings = {
 	level?: keyof typeof CoreEventLevelLabel;
+	scope?: keyof typeof CoreEventScopeLabel;
+	showScope?: boolean;
+	showOrigin?: boolean;
 	showTS?: boolean;
 	showLevel?: boolean;
 	showPhase?: boolean;
@@ -48,33 +54,41 @@ export type CLISettings = {
 
 export type CLIUserSettings<
 	TCustomEvents extends CoreEventsShape,
+	TCustomChannels extends CoreEventsChannelsShape,
 	TCustomStages extends CoreStagesShape,
 	TCustomGlobals extends CoreGlobalsShape,
 	TCustomModules extends CoreModulesShape,
-	TCustomTranslations extends CoreTranslationsShape
+	TCustomTranslations extends CoreTranslationsShape,
+	TCustomApp extends RuntimeAppShape
 > = {
 	meta?: Partial<CoreMetaShape["cli"]> | undefined;
 	settings?: CLISettings | undefined;
-	events: CoreEventsShapeDecl<TCustomEvents>,
-	stages: FinalStages<TCustomStages>,
-	translations: FinalTranslations<TCustomTranslations>,
-	globals: FinalGlobals<TCustomGlobals>,
-	modules: FinalModules<TCustomModules>,
+	events: CoreEventsShapeDecl<TCustomEvents>;
+	channels: FinalEventsChannels<TCustomChannels>;
+	stages: FinalStages<TCustomStages>;
+	translations: FinalTranslations<TCustomTranslations>;
+	globals: FinalGlobals<TCustomGlobals>;
+	modules: FinalModules<TCustomModules>;
+	app?: TCustomApp;
 }
 
 export type CLIOptions<
 	TCustomEvents extends CoreEventsShape = {},
+	TCustomChannels extends CoreEventsChannelsShape = {},
 	TCustomStages extends CoreStagesShape = {},
 	TCustomGlobals extends CoreGlobalsShape = {},
 	TCustomModules extends CoreModulesShape = {},
-	TCustomTranslations extends CoreTranslationsShape = {}
+	TCustomTranslations extends CoreTranslationsShape = {},
+	TCustomApp extends RuntimeAppShape = {}
 > = {
 	meta?: Partial<CoreMetaShape["cli"]> | undefined;
 	settings?: CLISettings;
 	events?: TCustomEvents;
+	channels?: TCustomChannels;
 	stages?: TCustomStages;
 	translations?: TCustomTranslations;
 	globals?: TCustomGlobals;
 	modules?: TCustomModules;
+	app?: TCustomApp
 }
 

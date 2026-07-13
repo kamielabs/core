@@ -11,7 +11,9 @@ import {
 	ParsedCliContextResult,
 	ModuleIndex,
 	ActionIndex,
-	CoreTranslationsShape
+	CoreTranslationsShape,
+	RuntimeAppShape,
+	CoreEventsChannelsShape
 } from "@types";
 
 /**
@@ -78,13 +80,15 @@ import {
  */
 export class ParserManager<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > {
 
-	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private _ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 	/**
 	 * Accumulated parsing result.
 	 *
@@ -124,10 +128,24 @@ export class ParserManager<
 	 *
 	 * @param ctx - Global execution context
 	 */
-	constructor(
-		ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>
+	private constructor(
+		ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
 	) {
 		this._ctx = ctx;
+	}
+
+	public static create<
+		TEvents extends CoreEventsShape,
+		TChannels extends CoreEventsChannelsShape,
+		TStages extends CoreStagesShape,
+		TGlobals extends CoreGlobalsShape,
+		TModules extends CoreModulesShape,
+		TTranslations extends CoreTranslationsShape,
+		TApp extends RuntimeAppShape
+	>(
+		ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>,
+	): ParserManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp> {
+		return new ParserManager(ctx);
 	}
 
 	public init: () => Promise<void> = async (): Promise<void> => { };
@@ -241,6 +259,7 @@ export class ParserManager<
 		}
 
 		const parsed = await this._ctx.helpers.parser.parseFlagsPhase(
+			this._ctx,
 			this.tokens,
 			this.cursor,
 			flagIndex,
@@ -362,6 +381,7 @@ export class ParserManager<
 		} else {
 
 			const moduleResult = await this._ctx.helpers.parser.parseKeywordPhase(
+				this._ctx,
 				this.tokens,
 				this.cursor,
 				"MODULE_MISSING",
@@ -404,6 +424,7 @@ export class ParserManager<
 			this.phase = "moduleFlags";
 
 			const moduleFlags = await this._ctx.helpers.parser.parseFlagsPhase(
+				this._ctx,
 				this.tokens,
 				this.cursor,
 				moduleFlagIndex,
@@ -439,6 +460,7 @@ export class ParserManager<
 		} else {
 
 			const actionResult = await this._ctx.helpers.parser.parseKeywordPhase(
+				this._ctx,
 				this.tokens,
 				this.cursor,
 				"ACTION_MISSING",
@@ -480,6 +502,7 @@ export class ParserManager<
 			this.phase = "actionFlags";
 
 			const actionFlags = await this._ctx.helpers.parser.parseFlagsPhase(
+				this._ctx,
 				this.tokens,
 				this.cursor,
 				actionFlagIndex,

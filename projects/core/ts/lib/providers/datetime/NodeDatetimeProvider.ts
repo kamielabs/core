@@ -30,6 +30,11 @@ import { DatetimeProvider } from "./DatetimeProvider";
  * @implements DatetimeProvider
  */
 export class NodeDatetimeProvider implements DatetimeProvider {
+	private constructor() { }
+
+	public static create(): NodeDatetimeProvider {
+		return new NodeDatetimeProvider();
+	}
 
 	/**
 	 * Get current timestamp using Node.js Date API.

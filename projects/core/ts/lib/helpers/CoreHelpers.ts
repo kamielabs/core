@@ -12,15 +12,10 @@
 
 import path from "node:path";
 
-import { Context } from "@contexts";
+import { CoreHelpersContext } from "@contexts";
 import {
-	CoreEventsShape,
-	CoreGlobalsShape,
-	CoreModulesShape,
-	CoreStagesShape,
-	CoreTranslationsShape,
 	PathAliases,
-	ResolvePathOptions
+	ResolvePathOptions,
 } from "@types";
 import { DEFAULT_PATH_ALIASES } from "@data";
 
@@ -46,17 +41,16 @@ import { DEFAULT_PATH_ALIASES } from "@data";
  * @template TModules
  * @template TTranslations
  */
-export class CoreHelpers<
-	TEvents extends CoreEventsShape,
-	TStages extends CoreStagesShape,
-	TGlobals extends CoreGlobalsShape,
-	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
-> {
-	constructor(private ctx: Context<
-		TEvents, TStages, TGlobals, TModules, TTranslations
-	>) { };
+export class CoreHelpers {
+	private _ctx: CoreHelpersContext;
 
+	private constructor(ctx: CoreHelpersContext) {
+		this._ctx = ctx;
+	};
+
+	public static create(ctx: CoreHelpersContext): CoreHelpers {
+		return new CoreHelpers(ctx);
+	}
 	/**
 	 * Deep-freeze an object graph in place.
 	 *
@@ -156,7 +150,7 @@ export class CoreHelpers<
 		let resolvedFilePath = filePath;
 
 		if (resolvedFilePath) {
-			resolvedFilePath = this.ctx.helpers.core.resolvePath(
+			resolvedFilePath = this.resolvePath(
 				resolvedFilePath,
 				{
 					env: process.env,
@@ -167,12 +161,12 @@ export class CoreHelpers<
 
 		if (
 			!resolvedFilePath ||
-			!this.ctx.providers.fs.fileExist(resolvedFilePath)
+			!this._ctx.providers.fs.fileExist(resolvedFilePath)
 		) {
 			return {};
 		}
 
-		const content = this.ctx.providers.fs.readTextFile(resolvedFilePath);
+		const content = this._ctx.providers.fs.readTextFile(resolvedFilePath);
 		const env: Record<string, string> = {};
 
 		for (const rawLine of content.split("\n")) {
@@ -308,7 +302,7 @@ export class CoreHelpers<
 		);
 	}
 
-	resolvePath(
+	public resolvePath(
 		input: string,
 		options: ResolvePathOptions = {},
 	): string {

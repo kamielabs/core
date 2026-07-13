@@ -3,10 +3,11 @@ import {
 	Context,
 	StageHook
 } from "@contexts";
-import { FinalStages } from "@data";
+import { BUILTIN_STAGES, FinalStages } from "@data";
 import {
 	BuiltinStageKey,
 	BuiltinStageOptions,
+	CoreEventsChannelsShape,
 	CoreEventsShape,
 	CoreGlobalsShape,
 	CoreModulesShape,
@@ -17,6 +18,7 @@ import {
 	CustomStageOptions,
 	DefaultStageOptions,
 	ParsedOptionValue,
+	RuntimeAppShape,
 	RuntimeStageFacts,
 	StageOption,
 	StageShape
@@ -75,13 +77,15 @@ import {
  */
 export class StagesManager<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > {
 
-	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private _ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 	private _dict: CoreStagesShapeDecl<TStages>;
 	private _draft?: RuntimeStageFacts | undefined;
 	private _resolved?: RuntimeStageFacts;
@@ -106,7 +110,7 @@ export class StagesManager<
 	 */
 	private _builtinStageHooks: {
 		[S in BuiltinStageKey<TStages>]?: StageHook<
-			TEvents, TStages, TGlobals, TModules, TTranslations,
+			TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp,
 			BuiltinStageOptions<TStages, S>
 		>
 	} = {};
@@ -118,7 +122,7 @@ export class StagesManager<
 	 */
 	private _customStageHooks: {
 		[S in CustomStageKey<TStages>]?: StageHook<
-			TEvents, TStages, TGlobals, TModules, TTranslations,
+			TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp,
 			CustomStageOptions<TStages, S>
 		>
 	} = {};
@@ -131,8 +135,8 @@ export class StagesManager<
 	 * @param ctx - Global execution context
 	 * @param stageDict - Fully resolved stage definitions
 	 */
-	constructor(
-		ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>,
+	private constructor(
+		ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>,
 		stages: FinalStages<TStages>
 	) {
 		this._ctx = ctx;
@@ -145,6 +149,21 @@ export class StagesManager<
 		// Build all lookup indexes once at construction
 		// this._resolveIndexes();
 		// this._freezeDict();
+	}
+
+	public static create<
+		TEvents extends CoreEventsShape,
+		TChannels extends CoreEventsChannelsShape,
+		TStages extends CoreStagesShape,
+		TGlobals extends CoreGlobalsShape,
+		TModules extends CoreModulesShape,
+		TTranslations extends CoreTranslationsShape,
+		TApp extends RuntimeAppShape
+	>(
+		ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>,
+		stages: FinalStages<TStages>
+	): StagesManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp> {
+		return new StagesManager(ctx, stages);
 	}
 
 	public init: () => Promise<void> = async (): Promise<void> => {
@@ -257,20 +276,6 @@ export class StagesManager<
 		}
 	}
 
-	private _resolveStageFile(
-		stageName: string,
-		stage: StageShape,
-	): string {
-		if (
-			stageName === "default" &&
-			this._builtinStageDefaults?.file
-		) {
-			return this._builtinStageDefaults.file;
-		}
-
-		return stage.file ?? "";
-	}
-
 	/**
 	 * Resolve a single option value.
 	 *
@@ -311,41 +316,37 @@ export class StagesManager<
 	 *
 	 * Applies only on draft (pre-resolution finalization).
 	 */
-	// private _applyBuiltinStageDefaults() {
-	// 	const values = this._builtinStageDefaults;
-	// 	if (!values) return;
-	//
-	//
-	// 	if (values.file !== undefined) {
-	// 		this.getDraft().file = values.file;
-	// 	}
-	//
-	// 	if (values.options) {
-	// 		for (const key of Object.keys(values.options) as Array<keyof typeof values.options>) {
-	// 			const value = values.options[key];
-	// 			if (value !== undefined) {
-	// 				(this.getDraft().options as Record<string, ParsedOptionValue>)[key] = value;
-	// 			}
-	// 		}
-	// 	}
-	// }
 	private _applyBuiltinStageDefaults(
 		stageName: string,
 		stage: StageShape,
-	): StageShape {
+	): void {
 		const values = this._builtinStageDefaults;
 
 		if (!values || stageName !== "default") {
-			return stage;
+			return;
 		}
-		const file = values.file ?? stage.file;
 
-		return {
-			...(file !== undefined ? { file } : {}),
-			options: {
-				...stage.options,
-			},
-		};
+		if (values.file !== undefined) {
+			stage.file = values.file;
+		}
+
+		if (values.options) {
+			for (const key of Object.keys(values.options) as Array<keyof typeof values.options>) {
+				const value = values.options[key];
+
+				if (value === undefined) {
+					continue;
+				}
+
+				const option = stage.options[key];
+
+				if (!option) {
+					continue;
+				}
+
+				option.default = value;
+			}
+		}
 	}
 	/**
 	 * Override builtin default stage values.
@@ -370,7 +371,7 @@ export class StagesManager<
 	>(
 		stage: S,
 		hook: StageHook<
-			TEvents, TStages, TGlobals, TModules, TTranslations,
+			TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp,
 			BuiltinStageOptions<TStages, S>
 		>
 	) {
@@ -388,7 +389,7 @@ export class StagesManager<
 	>(
 		stage: S,
 		hook: StageHook<
-			TEvents, TStages, TGlobals, TModules, TTranslations,
+			TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp,
 			CustomStageOptions<TStages, S>
 		>
 	) {
@@ -408,7 +409,7 @@ export class StagesManager<
 	public getStageHook(
 		stage: string
 	): StageHook<
-		TEvents, TStages, TGlobals, TModules, TTranslations
+		TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp
 	> | undefined {
 		const builtin = this._builtinStageHooks as Record<string, any>;
 		const custom = this._customStageHooks as Record<string, any>;
@@ -473,22 +474,24 @@ export class StagesManager<
 				? 'default'
 				: rawStage;
 
-		const stage = this._dict.stageIndex.byName[stageName];
+		const stage = this._ctx.helpers.core.deepClone(this._dict.stageIndex.byName[stageName]);
 
 		if (!stage) {
 			this._ctx.events.throw('stageMissing', { details: [`Name: ${stageName}`] })
+		}
+
+		// Apply defaults only for builtin stage
+		if (Object.hasOwn(BUILTIN_STAGES, stageName)) {
+			this._applyBuiltinStageDefaults(stageName, stage);
 		}
 
 		if (typeof stage.file !== 'string') {
 			this._ctx.events.throw('stageMissingFile', { details: [`StageFile: ${stage.file}`] });
 		}
 
-		if (stageName === "default") this._applyBuiltinStageDefaults(stageName, stage);
-
 		const envVars = process.env as Record<string, string | undefined>;
-		const stageFile = this._resolveStageFile(stageName, stage);
 
-		const fileEnv = this._ctx.helpers.core.loadEnvFile(stageFile);
+		const fileEnv = this._ctx.helpers.core.loadEnvFile(stage.file);
 
 		const resolvedOptions: Record<string, ParsedOptionValue> = {};
 
@@ -507,10 +510,6 @@ export class StagesManager<
 
 		this._setDraft(facts);
 
-		// Apply defaults only for builtin stage
-		// if (Object.hasOwn(this._builtinStageHooks, stageName)) {
-		// 	this._applyBuiltinStageDefaults();
-		// }
 
 		await this._ctx.events.emit('stageHooking');
 
@@ -521,9 +520,9 @@ export class StagesManager<
 		if (hook) {
 			await hook({
 				options: this.getDraft().options,
-				tools: this._ctx.tools.stageContext(),
-				runtime: this._ctx.runtime.stageContext(),
-				snapshot: this._ctx.snapshot.snapshotContext()
+				tools: this._ctx.services.tools.stageContext(this._ctx),
+				runtime: this._ctx.services.runtime.stageContext(this._ctx),
+				snapshot: this._ctx.services.snapshot.snapshotContext(this._ctx)
 			});
 		}
 

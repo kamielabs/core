@@ -59,6 +59,11 @@ export class CoreError extends Error {
 			code: 'F00103',
 			source: 'Builders.buildEvents'
 		},
+		channelDuplicateName: {
+			name: 'CORE_EVENTS_DUPLICATE_NAME',
+			code: 'F00104',
+			source: 'Builders.buildChannels'
+		},
 		stageFileDuplicated: {
 			name: 'CORE_STAGE_FILE_DUPLICATE',
 			code: 'F00300',
@@ -169,7 +174,7 @@ export class CoreError extends Error {
 			console.error(
 				`[CORE: ${error.code}] ${error.name}\n`,
 				`Source: ${error.source}\n`,
-				`Error: ${message}`
+				`Error: ${message}`,
 			);
 
 			// return process.stderr.write("") as never;

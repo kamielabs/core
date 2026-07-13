@@ -1,13 +1,15 @@
+import { ApiService, CoreConsoleService } from "@api";
 import {
 	buildEvents,
 	buildStages,
 	buildGlobals,
 	buildModules,
-	buildTranslations
+	buildTranslations,
+	buildChannels
 } from "@builders";
-import { Context, ContextCoreReady } from "@contexts";
+import { Context } from "@contexts";
 import { CoreEngine } from "@engines";
-import { CoreError, CoreHelpers, ModulesHelpers, ParserHelpers } from "@helpers";
+import { CoreError, CoreEventError, CoreHelpers, ModulesHelpers, ParserHelpers } from "@helpers";
 import {
 	BootstrapManager,
 	EventsManager,
@@ -16,6 +18,7 @@ import {
 	MetaManager,
 	ModulesManager,
 	ParserManager,
+	RuntimeManager,
 	StagesManager
 } from "@managers";
 import { CoreProviders } from "@providers";
@@ -24,8 +27,6 @@ import { NodeFsProvider } from "@providers/fs";
 import { UlidIdProvider } from "@providers/id";
 import { NodeProcessProvider } from "@providers/process";
 import {
-	ApiService,
-	CoreConsoleService,
 	RuntimeService,
 	SnapshotService,
 	ToolsService
@@ -38,7 +39,9 @@ import {
 	CoreModulesShape,
 	CLISettings,
 	CoreTranslationsShape,
-	CLIUserSettings
+	CLIUserSettings,
+	RuntimeAppShape,
+	CoreEventsChannelsShape
 } from "@types";
 
 /**
@@ -112,10 +115,12 @@ import {
  */
 export class CLI<
 	const TEvents extends CoreEventsShape,
+	const TChannels extends CoreEventsChannelsShape,
 	const TStages extends CoreStagesShape,
 	const TGlobals extends CoreGlobalsShape,
 	const TModules extends CoreModulesShape,
-	const TTranslations extends CoreTranslationsShape
+	const TTranslations extends CoreTranslationsShape,
+	const TApp extends RuntimeAppShape
 > {
 
 	/**
@@ -126,29 +131,19 @@ export class CLI<
 			skipI18nWarnings: false,
 			console: {
 				level: 'info',
+				scope: 'app',
+				showScope: false,
+				showOrigin: false,
 				showLevel: false,
 				showTS: false,
 				showPhase: false,
 			},
 			engine: 'fed',
 		},
-		ready: {
-			providers: false,
-			events: false,
-			coreconsole: false,
-			bootstrap: false,
-			stages: false,
-			i18n: false,
-			parser: false,
-			globals: false,
-			modules: false,
-			runtime: false,
-			tools: false,
-			snapshot: false,
-			engine: false
-		},
-		helpers: { core: {} }
-	} as Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+		helpers: { core: {} },
+		services: { snapshot: {}, tools: {}, runtime: {} },
+		api: { console: {}, devapi: {} }
+	} as Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 
 	/**
 	 * Private constructor.
@@ -161,24 +156,21 @@ export class CLI<
 	 * - `EventsManager` is created immediately
 	 * - all other managers/services are only instantiated here and initialized later
 	 */
-	private constructor(options: CLIUserSettings<TEvents, TStages, TGlobals, TModules, TTranslations>) {
+	private constructor(options: CLIUserSettings<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>) {
 
 		// Basic CLI settings ovverriding
 		this._overrideSettings(options.settings);
 
 		// Providers for external imports in the core
 		this._ctx.providers = this._setupProviders();
-		this._ctx.ready.providers = true;
 
 		// helpers iare methods available for the core
-		this._ctx.helpers.core = new CoreHelpers(this._ctx);
-		this._ctx.helpers.parser = new ParserHelpers(this._ctx);
-		this._ctx.helpers.modules = new ModulesHelpers(this._ctx);
-		this._ctx.ready.helpers = true;
+		this._ctx.helpers.core = CoreHelpers.create(this._ctx);
+		this._ctx.helpers.parser = ParserHelpers.create();
+		this._ctx.helpers.modules = ModulesHelpers.create();
 
 		// Eventually the real first class, the events, everything else is based on it
-		this._ctx.events = new EventsManager(this._ctx, options.events);
-		this._ctx.ready.events = true;
+		this._ctx.events = EventsManager.create(this._ctx, options.events, options.channels);
 
 		// Now Managers/Services car be instanciate
 		this._setupContext(options);
@@ -191,26 +183,31 @@ export class CLI<
 	 * At this stage components are only constructed, not fully initialized.
 	 * Their async `init()` methods are executed later by `_initContext()`.
 	 */
-	private _setupContext(options: CLIUserSettings<TEvents, TStages, TGlobals, TModules, TTranslations>) {
+	private _setupContext(options: CLIUserSettings<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>) {
 
-		// Start all services
-		this._ctx.coreconsole = new CoreConsoleService(this._ctx);
-		this._ctx.runtime = new RuntimeService(this._ctx);
-		this._ctx.tools = new ToolsService(this._ctx);
-		this._ctx.snapshot = new SnapshotService(this._ctx);
-		this._ctx.devapi = new ApiService(this._ctx);
+		// Start all APIs
+		this._ctx.api.console = CoreConsoleService.create(this._ctx);
+		this._ctx.api.devapi = ApiService.create(this._ctx);
+
+		// start runtimeManager
+		this._ctx.runtime = RuntimeManager.create(this._ctx, options.app || {} as TApp);
+
+		// start all Services
+		this._ctx.services.runtime = RuntimeService.create();
+		this._ctx.services.tools = ToolsService.create();
+		this._ctx.services.snapshot = SnapshotService.create();
 
 		// Start now managers
-		this._ctx.meta = new MetaManager(this._ctx, options.meta);
-		this._ctx.bootstrap = new BootstrapManager(this._ctx);
-		this._ctx.stages = new StagesManager(this._ctx, options.stages);
-		this._ctx.i18n = new I18nManager(this._ctx, options.translations);
-		this._ctx.parser = new ParserManager(this._ctx);
-		this._ctx.globals = new GlobalsManager(this._ctx, options.globals);
-		this._ctx.modules = new ModulesManager(this._ctx, options.modules);
+		this._ctx.meta = MetaManager.create(this._ctx, options.meta);
+		this._ctx.bootstrap = BootstrapManager.create(this._ctx);
+		this._ctx.stages = StagesManager.create(this._ctx, options.stages);
+		this._ctx.i18n = I18nManager.create(this._ctx, options.translations);
+		this._ctx.parser = ParserManager.create(this._ctx);
+		this._ctx.globals = GlobalsManager.create(this._ctx, options.globals);
+		this._ctx.modules = ModulesManager.create(this._ctx, options.modules);
 
 		// And finally engine
-		this._ctx.engine = new CoreEngine(this._ctx);
+		this._ctx.engine = CoreEngine.create(this._ctx);
 
 	}
 
@@ -224,34 +221,24 @@ export class CLI<
 	 */
 	private async _initContext() {
 		// Services Init First
-		await this._initManager('coreconsole', this._ctx.coreconsole.init);
-		await this._initManager('runtime', this._ctx.runtime.init);
-		await this._initManager('tools', this._ctx.tools.init);
-		await this._initManager('snapshot', this._ctx.snapshot.init);
-		await this._initManager('devapi', this._ctx.devapi.init);
+		await this._ctx.api.console.init();
+		await this._ctx.runtime.init();
+		await this._ctx.services.tools.init();
+		await this._ctx.services.snapshot.init();
+		await this._ctx.api.devapi.init();
 
 
-		await this._initManager('meta', this._ctx.meta.init);
-		await this._initManager('bootstrap', this._ctx.bootstrap.init);
-		await this._initManager('stages', this._ctx.stages.init);
-		await this._initManager('i18n', this._ctx.i18n.init);
-		await this._initManager('parser', this._ctx.parser.init);
-		await this._initManager('globals', this._ctx.globals.init);
-		await this._initManager('modules', this._ctx.modules.init);
+		await this._ctx.meta.init();
+		await this._ctx.bootstrap.init();
+		await this._ctx.stages.init();
+		await this._ctx.i18n.init();
+		await this._ctx.parser.init();
+		await this._ctx.globals.init();
+		await this._ctx.modules.init();
 
-		await this._initManager('engine', this._ctx.engine.init);
+		await this._ctx.engine.init();
 	}
 
-	/**
-	 * Initialize one context component and mark its readiness flag.
-	 */
-	private async _initManager<K extends keyof ContextCoreReady>(
-		key: K,
-		init: () => Promise<void>
-	) {
-		await init();
-		this._ctx.ready[key] = true;
-	}
 	/**
 	 * Override default CLI settings.
 	 */
@@ -263,6 +250,9 @@ export class CLI<
 			if (settings.console !== undefined) {
 				this._ctx.settings.console ??= {};
 				if (settings.console.level !== undefined) this._ctx.settings.console.level = settings.console.level;
+				if (settings.console.scope !== undefined) this._ctx.settings.console.scope = settings.console.scope;
+				if (settings.console.showScope !== undefined) this._ctx.settings.console.showScope = settings.console.showScope;
+				if (settings.console.showOrigin !== undefined) this._ctx.settings.console.showOrigin = settings.console.showOrigin;
 				if (settings.console.showLevel !== undefined) this._ctx.settings.console.showLevel = settings.console.showLevel;
 				if (settings.console.showTS !== undefined) this._ctx.settings.console.showTS = settings.console.showTS;
 				if (settings.console.showPhase !== undefined) this._ctx.settings.console.showPhase = settings.console.showPhase;
@@ -274,11 +264,17 @@ export class CLI<
 	 * Setup default providers.
 	 */
 	private _setupProviders(): CoreProviders {
+		const id = UlidIdProvider.create()
+		const process = NodeProcessProvider.create()
+		const fs = NodeFsProvider.create()
+		const datetime = NodeDatetimeProvider.create()
+
+
 		return {
-			id: new UlidIdProvider(),
-			process: new NodeProcessProvider(),
-			fs: new NodeFsProvider(),
-			datetime: new NodeDatetimeProvider()
+			id,
+			process,
+			fs,
+			datetime
 		}
 	}
 
@@ -296,15 +292,16 @@ export class CLI<
 			CoreError.panic(err.key, err.desc);
 		}
 
-		if (err instanceof Error) {
-			CoreError.panic("unknownError", err.message);
+		if (err instanceof CoreEventError) {
+			console.error(err.message);
+			process.exit(err.exitCode);
 		}
 
+		if (desc) console.error(desc);
+		throw err;
+		// CoreError.panic("unknownError", desc);
 
-		CoreError.panic(
-			"unknownError",
-			desc ?? "Unknown CLI Error"
-		);
+
 	}
 
 	/**
@@ -319,13 +316,15 @@ export class CLI<
 	 */
 	static init<
 		const TEvents extends CoreEventsShape,
+		const TChannels extends CoreEventsChannelsShape,
 		const TStages extends CoreStagesShape,
 		const TGlobals extends CoreGlobalsShape,
 		const TModules extends CoreModulesShape,
-		const TTranslations extends CoreTranslationsShape
+		const TTranslations extends CoreTranslationsShape,
+		TApp extends RuntimeAppShape
 	>(
-		options?: CLIOptions<TEvents, TStages, TGlobals, TModules, TTranslations>,
-	): CLI<TEvents, TStages, TGlobals, TModules, TTranslations> {
+		options?: CLIOptions<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>,
+	): CLI<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp> {
 
 		try {
 
@@ -334,9 +333,11 @@ export class CLI<
 				settings: options?.settings,
 				translations: buildTranslations(options?.translations),
 				events: buildEvents(options?.events),
+				channels: buildChannels(options?.channels),
 				stages: buildStages(options?.stages),
 				globals: buildGlobals(options?.globals),
 				modules: buildModules(options?.modules),
+				app: options?.app || {} as TApp
 			});
 
 			return instance;
@@ -351,8 +352,8 @@ export class CLI<
 	 *
 	 * @returns ApiService (readonly)
 	 */
-	public hooks(): Readonly<ApiService<TEvents, TStages, TGlobals, TModules, TTranslations>> {
-		return this._ctx.devapi;
+	public hooks(): Readonly<ApiService<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>> {
+		return this._ctx.api.devapi;
 	}
 
 	/**
@@ -361,7 +362,7 @@ export class CLI<
 	 * This remains a low-level surface intended mostly for internal work and
 	 * advanced debugging; the stable developer-facing API is `hooks()`.
 	 */
-	public ctx(): Readonly<Context<TEvents, TStages, TGlobals, TModules, TTranslations>> {
+	public ctx(): Readonly<Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>> {
 		return this._ctx;
 	}
 

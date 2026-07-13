@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import type { RuntimeTestSuite } from "./types";
-import { CoreEventsShape, CoreGlobalsShape, CoreModulesShape, CoreStagesShape, CoreTranslationsShape } from "@types";
+import { CoreEventsChannelsShape, CoreEventsShape, CoreGlobalsShape, CoreModulesShape, CoreStagesShape, CoreTranslationsShape, RuntimeAppShape } from "@types";
 
 import {
 	captureOutput,
@@ -14,18 +14,22 @@ import {
 
 export function createRuntimeTests<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
 	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape,
 	TSetup = unknown
 >(
 	suite: RuntimeTestSuite<
 		TEvents,
+		TChannels,
 		TStages,
 		TGlobals,
 		TModules,
 		TTranslations,
+		TApp,
 		TSetup
 	>
 ) {

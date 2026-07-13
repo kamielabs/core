@@ -7,6 +7,7 @@
 // - This is a typing contract only
 // - Any structural change in final data composition must be reflected here
 
+import { FinalEventsChannels } from "@data";
 import {
 	CoreMetaShape,
 	CLISettings,
@@ -19,7 +20,8 @@ import {
 	CoreGlobalsDecl,
 	CoreTranslationsDecl,
 	CoreStagesShapeDecl,
-	CoreEventsShapeDecl
+	CoreEventsShapeDecl,
+	CoreEventsChannelsShape
 } from "@types";
 
 /**
@@ -47,6 +49,7 @@ import {
  */
 export type SnapshotFullContext<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
@@ -65,6 +68,7 @@ export type SnapshotFullContext<
 	 * Final merged events dictionary.
 	 */
 	events: CoreEventsShapeDecl<TEvents>;
+	channels: FinalEventsChannels<TChannels>;
 
 	/**
 	 * Final merged stages dictionary.

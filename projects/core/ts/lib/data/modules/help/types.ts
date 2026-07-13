@@ -1,5 +1,6 @@
 import { SnapshotFullContext } from "@contexts";
 import {
+	CoreEventsChannelsShape,
 	CoreEventsShape,
 	CoreGlobalsShape,
 	CoreModulesShape,
@@ -31,6 +32,7 @@ export type HelpRoute =
 
 export type Snapshot = SnapshotFullContext<
 	CoreEventsShape,
+	CoreEventsChannelsShape,
 	CoreStagesShape,
 	CoreGlobalsShape,
 	CoreModulesShape,

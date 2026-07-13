@@ -15,7 +15,9 @@ import {
 	CoreModulesShape,
 	CoreStagesShape,
 	CoreTranslationsShape,
-	EngineState
+	RuntimeAppShape,
+	EngineState,
+	CoreEventsChannelsShape
 } from "@types";
 
 /**
@@ -58,18 +60,20 @@ import {
  */
 export class StandardEngine<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > {
 
-	private _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private _ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 	private _state: EngineState = "idle";
 	private _runner: () => Promise<void> | void
 
 	constructor(
-		ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>,
+		ctx: Context<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>,
 		runner: () => Promise<void> | void
 	) {
 		this._ctx = ctx;

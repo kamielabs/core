@@ -158,6 +158,7 @@ export function buildTranslations<TCustom extends CoreTranslationsShape = {}>(
 				false
 			);
 
+
 			if (expected !== msg.name) {
 				throw new CoreError(
 					"i18nInvalidKey",

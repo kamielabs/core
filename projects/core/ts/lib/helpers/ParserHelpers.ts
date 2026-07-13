@@ -40,23 +40,20 @@ import {
 	CoreGlobalsShape,
 	CoreModulesShape,
 	CoreTranslationsShape,
+	RuntimeAppShape,
+	CoreEventsChannelsShape,
 } from "@types";
 import { ParsedOptionValue } from "@types";
-import { Context } from "@contexts";
+import { ParserHelpersContext } from "@contexts";
 
-export class ParserHelpers<
-	TEvents extends CoreEventsShape,
-	TStages extends CoreStagesShape,
-	TGlobals extends CoreGlobalsShape,
-	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
-> {
+export class ParserHelpers {
 
-	private readonly _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
 
-	constructor(ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>) {
-		this._ctx = ctx;
-	};
+	private constructor() { };
+
+	public static create(): ParserHelpers {
+		return new ParserHelpers();
+	}
 
 	/**
 	 * Safe typed hasOwnProperty
@@ -104,26 +101,38 @@ export class ParserHelpers<
 	 * 3. Validate value rules
 	 * 4. Return structured token
 	 */
-	public async parseLongFlagToken(token: string, index: FlagIndex): Promise<ParsedFlagToken> {
+	public async parseLongFlagToken<
+		TEvents extends CoreEventsShape,
+		TChannels extends CoreEventsChannelsShape,
+		TStages extends CoreStagesShape,
+		TGlobals extends CoreGlobalsShape,
+		TModules extends CoreModulesShape,
+		TTranslations extends CoreTranslationsShape,
+		TApp extends RuntimeAppShape
+	>(
+		ctx: ParserHelpersContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>,
+		token: string,
+		index: FlagIndex
+	): Promise<ParsedFlagToken> {
 		const eqIndex = token.indexOf("=");
 		const rawKey = eqIndex === -1 ? token : token.slice(0, eqIndex);
 		const value = eqIndex === -1 ? undefined : token.slice(eqIndex + 1);
 
 		const entry = index.byKey[rawKey];
 
-		const phase = this._ctx.parser.getPhase();
+		const phase = ctx.parser.getPhase();
 		const scope = phase === 'globalFlags' ? 'globals' : phase === 'moduleFlags' ? 'module' : 'action';
 
 		if (!entry) {
 			switch (phase) {
 				case 'globalFlags':
-					await this._ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: rawKey, scope } });
+					await ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: rawKey, scope } });
 					break;
 				case 'moduleFlags':
-					await this._ctx.events.warn('parserUnknownModuleFlag', { values: { flag: rawKey, scope } });
+					await ctx.events.warn('parserUnknownModuleFlag', { values: { flag: rawKey, scope } });
 					break;
 				case 'actionFlags':
-					await this._ctx.events.warn('parserUnknownActionFlag', { values: { flag: rawKey, scope } });
+					await ctx.events.warn('parserUnknownActionFlag', { values: { flag: rawKey, scope } });
 					break;
 				default: break;
 			}
@@ -137,11 +146,11 @@ export class ParserHelpers<
 
 		if ("valueHint" in cli && cli.valueHint !== undefined) {
 			if (value === undefined) {
-				await this._ctx.events.warn('parserMissingFlagValue', { values: { flag: rawKey, scope } });
+				await ctx.events.warn('parserMissingFlagValue', { values: { flag: rawKey, scope } });
 			}
 		} else if ("value" in cli) {
 			if (value !== undefined) {
-				await this._ctx.events.warn('parserUnexpectedFlagValue', { values: { flag: rawKey, scope } });
+				await ctx.events.warn('parserUnexpectedFlagValue', { values: { flag: rawKey, scope } });
 			}
 		}
 
@@ -175,22 +184,34 @@ export class ParserHelpers<
 	 * - Only last flag can receive value
 	 * - valueHint flags must be last
 	 */
-	public async parseShortFlagToken(token: string, index: FlagIndex): Promise<ParsedFlagToken> {
+	public async parseShortFlagToken<
+		TEvents extends CoreEventsShape,
+		TChannels extends CoreEventsChannelsShape,
+		TStages extends CoreStagesShape,
+		TGlobals extends CoreGlobalsShape,
+		TModules extends CoreModulesShape,
+		TTranslations extends CoreTranslationsShape,
+		TApp extends RuntimeAppShape
+	>(
+		ctx: ParserHelpersContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>,
+		token: string,
+		index: FlagIndex
+	): Promise<ParsedFlagToken> {
 		const body = token.slice(1);
 
-		const phase = this._ctx.parser.getPhase();
+		const phase = ctx.parser.getPhase();
 		const scope = phase === 'globalFlags' ? 'globals' : phase === 'moduleFlags' ? 'module' : 'action';
 
 		if (body.length === 0) {
 			switch (phase) {
 				case 'globalFlags':
-					await this._ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: token, scope } });
+					await ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: token, scope } });
 					break;
 				case 'moduleFlags':
-					await this._ctx.events.warn('parserUnknownModuleFlag', { values: { flag: token, scope } });
+					await ctx.events.warn('parserUnknownModuleFlag', { values: { flag: token, scope } });
 					break;
 				case 'actionFlags':
-					await this._ctx.events.warn('parserUnknownActionFlag', { values: { flag: token, scope } });
+					await ctx.events.warn('parserUnknownActionFlag', { values: { flag: token, scope } });
 					break;
 				default: break;
 			}
@@ -210,13 +231,13 @@ export class ParserHelpers<
 			if (!entry) {
 				switch (phase) {
 					case 'globalFlags':
-						await this._ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: token, scope } });
+						await ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: token, scope } });
 						break;
 					case 'moduleFlags':
-						await this._ctx.events.warn('parserUnknownModuleFlag', { values: { flag: token, scope } });
+						await ctx.events.warn('parserUnknownModuleFlag', { values: { flag: token, scope } });
 						break;
 					case 'actionFlags':
-						await this._ctx.events.warn('parserUnknownActionFlag', { values: { flag: token, scope } });
+						await ctx.events.warn('parserUnknownActionFlag', { values: { flag: token, scope } });
 						break;
 					default: break;
 				}
@@ -231,7 +252,7 @@ export class ParserHelpers<
 			if ("valueHint" in cli && cli.valueHint !== undefined) {
 				// ok
 			} else {
-				await this._ctx.events.warn('parserUnexpectedFlagValue', { values: { flag: rawKey, scope } });
+				await ctx.events.warn('parserUnexpectedFlagValue', { values: { flag: rawKey, scope } });
 			}
 
 			return {
@@ -250,13 +271,13 @@ export class ParserHelpers<
 			if (!entry) {
 				switch (phase) {
 					case 'globalFlags':
-						await this._ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: token, scope } });
+						await ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: token, scope } });
 						break;
 					case 'moduleFlags':
-						await this._ctx.events.warn('parserUnknownModuleFlag', { values: { flag: token, scope } });
+						await ctx.events.warn('parserUnknownModuleFlag', { values: { flag: token, scope } });
 						break;
 					case 'actionFlags':
-						await this._ctx.events.warn('parserUnknownActionFlag', { values: { flag: token, scope } });
+						await ctx.events.warn('parserUnknownActionFlag', { values: { flag: token, scope } });
 						break;
 					default: break;
 				}
@@ -270,7 +291,7 @@ export class ParserHelpers<
 			const cli = entry.cliOption;
 
 			if ("valueHint" in cli && cli.valueHint !== undefined) {
-				await this._ctx.events.warn('parserMissingFlagValue', { values: { flag: token, scope } });
+				await ctx.events.warn('parserMissingFlagValue', { values: { flag: token, scope } });
 			}
 
 			return {
@@ -295,13 +316,13 @@ export class ParserHelpers<
 			if (!entry) {
 				switch (phase) {
 					case 'globalFlags':
-						await this._ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: `${rawKey} in group "${token}"`, scope } });
+						await ctx.events.warn('parserUnknownGlobalFlag', { values: { flag: `${rawKey} in group "${token}"`, scope } });
 						break;
 					case 'moduleFlags':
-						await this._ctx.events.warn('parserUnknownModuleFlag', { values: { flag: `${rawKey} in group "${token}"`, scope } });
+						await ctx.events.warn('parserUnknownModuleFlag', { values: { flag: `${rawKey} in group "${token}"`, scope } });
 						break;
 					case 'actionFlags':
-						await this._ctx.events.warn('parserUnknownActionFlag', { values: { flag: `${rawKey} in group "${token}"`, scope } });
+						await ctx.events.warn('parserUnknownActionFlag', { values: { flag: `${rawKey} in group "${token}"`, scope } });
 						break;
 					default: break;
 				}
@@ -313,13 +334,13 @@ export class ParserHelpers<
 
 			if ("valueHint" in cli && cli.valueHint !== undefined) {
 				if (!isLast) {
-					await this._ctx.events.warn('parserInvalidShortGroup', { values: { flag: rawKey, scope } });
+					await ctx.events.warn('parserInvalidShortGroup', { values: { flag: rawKey, scope } });
 					entries.push({ entry });
 					continue;
 				}
 
 				if (valuePart === undefined) {
-					await this._ctx.events.warn('parserMissingFlagValue', { values: { flag: rawKey, scope } });
+					await ctx.events.warn('parserMissingFlagValue', { values: { flag: rawKey, scope } });
 					entries.push({ entry });
 					continue;
 				}
@@ -330,7 +351,7 @@ export class ParserHelpers<
 
 			if ("value" in cli) {
 				if (isLast && valuePart !== undefined) {
-					await this._ctx.events.warn('parserUnexpectedFlagValue', { values: { flag: token, scope } });
+					await ctx.events.warn('parserUnexpectedFlagValue', { values: { flag: token, scope } });
 				}
 
 				entries.push({ entry });
@@ -350,12 +371,24 @@ export class ParserHelpers<
 	/**
 	 * Dispatch helper
 	 */
-	public async parseFlagToken(token: string, index: FlagIndex): Promise<ParsedFlagToken> {
+	public async parseFlagToken<
+		TEvents extends CoreEventsShape,
+		TChannels extends CoreEventsChannelsShape,
+		TStages extends CoreStagesShape,
+		TGlobals extends CoreGlobalsShape,
+		TModules extends CoreModulesShape,
+		TTranslations extends CoreTranslationsShape,
+		TApp extends RuntimeAppShape
+	>(
+		ctx: ParserHelpersContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>,
+		token: string,
+		index: FlagIndex
+	): Promise<ParsedFlagToken> {
 		if (token.startsWith("--")) {
-			return await this.parseLongFlagToken(token, index);
+			return await this.parseLongFlagToken(ctx, token, index);
 		}
 
-		return await this.parseShortFlagToken(token, index);
+		return await this.parseShortFlagToken(ctx, token, index);
 	}
 
 	/**
@@ -366,7 +399,16 @@ export class ParserHelpers<
 	 * - value resolution
 	 * - metadata tracking
 	 */
-	public async applyFlag(
+	public async applyFlag<
+		TEvents extends CoreEventsShape,
+		TChannels extends CoreEventsChannelsShape,
+		TStages extends CoreStagesShape,
+		TGlobals extends CoreGlobalsShape,
+		TModules extends CoreModulesShape,
+		TTranslations extends CoreTranslationsShape,
+		TApp extends RuntimeAppShape
+	>(
+		ctx: ParserHelpersContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>,
 		entry: IndexedFlag,
 		value: string | undefined,
 		values: Record<string, ParsedOptionValue>,
@@ -380,11 +422,11 @@ export class ParserHelpers<
 				: entry.cliOption.long;
 		const optionName = entry.optionName;
 
-		const phase = this._ctx.parser.getPhase();
+		const phase = ctx.parser.getPhase();
 		const scope = phase === 'globalFlags' ? 'globals' : phase === 'moduleFlags' ? 'module' : 'action';
 
 		if (this.hasOwn(values, runtimeKey)) {
-			await this._ctx.events.warn('parserDuplicateFlag', { values: { flag: token, opt: optionName, scope } });
+			await ctx.events.warn('parserDuplicateFlag', { values: { flag: token, opt: optionName, scope } });
 			return;
 		}
 
@@ -408,7 +450,16 @@ export class ParserHelpers<
 	 * - non-flag token
 	 * - "--" stop token
 	 */
-	public async parseFlagsPhase(
+	public async parseFlagsPhase<
+		TEvents extends CoreEventsShape,
+		TChannels extends CoreEventsChannelsShape,
+		TStages extends CoreStagesShape,
+		TGlobals extends CoreGlobalsShape,
+		TModules extends CoreModulesShape,
+		TTranslations extends CoreTranslationsShape,
+		TApp extends RuntimeAppShape
+	>(
+		ctx: ParserHelpersContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>,
 		tokens: string[],
 		startCursor: number,
 		index: FlagIndex,
@@ -437,15 +488,15 @@ export class ParserHelpers<
 				break;
 			}
 
-			const parsed = await this.parseFlagToken(token, index);
+			const parsed = await this.parseFlagToken(ctx, token, index);
 
 			if (parsed.kind === "single") {
-				await this.applyFlag(parsed.entry, parsed.value, values, meta, token, keyMode);
+				await this.applyFlag(ctx, parsed.entry, parsed.value, values, meta, token, keyMode);
 			}
 
 			if (parsed.kind === "group") {
 				for (const item of parsed.entries) {
-					await this.applyFlag(item.entry, item.value, values, meta, token, keyMode);
+					await this.applyFlag(ctx, item.entry, item.value, values, meta, token, keyMode);
 				}
 			}
 
@@ -470,7 +521,16 @@ export class ParserHelpers<
 	/**
 	 * Keyword phase (module / action)
 	 */
-	public async parseKeywordPhase(
+	public async parseKeywordPhase<
+		TEvents extends CoreEventsShape,
+		TChannels extends CoreEventsChannelsShape,
+		TStages extends CoreStagesShape,
+		TGlobals extends CoreGlobalsShape,
+		TModules extends CoreModulesShape,
+		TTranslations extends CoreTranslationsShape,
+		TApp extends RuntimeAppShape
+	>(
+		ctx: ParserHelpersContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>,
 		tokens: string[],
 		startCursor: number,
 		code: "MODULE_MISSING" | "ACTION_MISSING",
@@ -480,8 +540,8 @@ export class ParserHelpers<
 		let stopParsing = false;
 
 		if (cursor >= tokens.length) {
-			if (code === "MODULE_MISSING") await this._ctx.events.warn('parserMissingModule');
-			else await this._ctx.events.warn('parserMissingAction', { values: { module: this._ctx.parser.getDraft().context.module! } });
+			if (code === "MODULE_MISSING") await ctx.events.warn('parserMissingModule');
+			else await ctx.events.warn('parserMissingAction', { values: { module: ctx.parser.getDraft().context.module! } });
 			return { cursor, stopParsing };
 		}
 
@@ -489,30 +549,30 @@ export class ParserHelpers<
 		if (!token) {
 			stopParsing = true;
 			cursor++;
-			if (code === "MODULE_MISSING") await this._ctx.events.warn('parserMissingModule');
-			else await this._ctx.events.warn('parserMissingAction', { values: { module: this._ctx.parser.getDraft().context.module! } });
+			if (code === "MODULE_MISSING") await ctx.events.warn('parserMissingModule');
+			else await ctx.events.warn('parserMissingAction', { values: { module: ctx.parser.getDraft().context.module! } });
 			return { cursor, stopParsing };
 		}
 
 		if (token === "--") {
 			stopParsing = true;
 			cursor++;
-			if (code === "MODULE_MISSING") await this._ctx.events.warn('parserMissingModule');
-			else await this._ctx.events.warn('parserMissingAction', { values: { module: this._ctx.parser.getDraft().context.module! } });
+			if (code === "MODULE_MISSING") await ctx.events.warn('parserMissingModule');
+			else await ctx.events.warn('parserMissingAction', { values: { module: ctx.parser.getDraft().context.module! } });
 			return { cursor, stopParsing };
 		}
 
 		if (token.startsWith("-")) {
-			if (code === "MODULE_MISSING") await this._ctx.events.warn('parserMissingModule');
-			else await this._ctx.events.warn('parserMissingAction', { values: { module: this._ctx.parser.getDraft().context.module! } });
+			if (code === "MODULE_MISSING") await ctx.events.warn('parserMissingModule');
+			else await ctx.events.warn('parserMissingAction', { values: { module: ctx.parser.getDraft().context.module! } });
 			return { cursor, stopParsing };
 		}
 
 		if (exists && !exists(token)) {
-			if (code === "MODULE_MISSING") await this._ctx.events.warn('parserUnknownModule', { values: { module: token } });
-			else await this._ctx.events.warn('parserUnknownAction', {
+			if (code === "MODULE_MISSING") await ctx.events.warn('parserUnknownModule', { values: { module: token } });
+			else await ctx.events.warn('parserUnknownAction', {
 				values: {
-					module: this._ctx.parser.getDraft().context.module!,
+					module: ctx.parser.getDraft().context.module!,
 					action: token
 				}
 			});
@@ -552,4 +612,5 @@ export class ParserHelpers<
 			args
 		};
 	}
+
 }

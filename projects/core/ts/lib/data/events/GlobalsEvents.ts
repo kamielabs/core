@@ -2,6 +2,7 @@ import {
 	CoreEventKind,
 	CoreEventLevel,
 	CoreEventPhase,
+	CoreEventScope,
 	CoreEventsShape
 } from "@types";
 
@@ -19,38 +20,44 @@ export const BUILTIN_GLOBALS_EVENTS = {
 		name: 'core.globals.missing.draft',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
-		phase: CoreEventPhase.globals
+		phase: CoreEventPhase.globals,
+		scope: CoreEventScope.app
 	},
 	globalsAlreadyResolved: {
 		name: 'core.globals.already.resolved',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.globals,
+		scope: CoreEventScope.app
 	},
 	globalsMissingResolved: {
 		name: 'core.globals.missing.resolved',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
 		phase: CoreEventPhase.globals,
+		scope: CoreEventScope.app
 	},
 	// Globals Indexes Fatal & Error (have to be signals)
 	globalsDuplicateEnv: {
 		name: 'core.globals.duplicate.env',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
-		phase: CoreEventPhase.globals
+		phase: CoreEventPhase.globals,
+		scope: CoreEventScope.app
 	},
 	globalsConflictEnv: {
 		name: 'core.globals.conflict.env',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
-		phase: CoreEventPhase.globals
+		phase: CoreEventPhase.globals,
+		scope: CoreEventScope.app
 	},
 	globalsDuplicateFlag: {
 		name: 'core.globals.duplicate.flag',
 		level: CoreEventLevel.fatal,
 		kind: CoreEventKind.signal,
-		phase: CoreEventPhase.globals
+		phase: CoreEventPhase.globals,
+		scope: CoreEventScope.app
 	},
 	// FLOW Signals
 	globalsInit: {
@@ -58,18 +65,21 @@ export const BUILTIN_GLOBALS_EVENTS = {
 		level: CoreEventLevel.trace,
 		kind: CoreEventKind.message,
 		phase: CoreEventPhase.globals,
+		scope: CoreEventScope.core
 	},
 	globalsHooking: {
 		name: 'core.globals.hooking',
 		level: CoreEventLevel.trace,
 		kind: CoreEventKind.message,
 		phase: CoreEventPhase.globals,
+		scope: CoreEventScope.core
 	},
 	globalsReady: {
 		name: 'core.globals.ready',
 		level: CoreEventLevel.trace,
 		kind: CoreEventKind.message,
 		phase: CoreEventPhase.globals,
+		scope: CoreEventScope.core,
 		trigger: true // Event Triggers are set up on runtime.init(for first flow event) and then ready phase
 	},
 } as const satisfies CoreEventsShape;

@@ -1,8 +1,16 @@
-export type {
+export {
 	CoreEventKind,
 	CoreEventPhase,
 	CoreEventLevel,
+	CoreEventKindLabel,
+	CoreEventPhaseLabel,
+	CoreEventLevelLabel
+} from "@types";
+export type {
 	GlobalOption,
-	Option
+	Option,
+	CoreEvent,
+	RuntimeCoreEvent,
+	CoreMessage
 } from "@types";
 

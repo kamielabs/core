@@ -29,6 +29,11 @@ import { spawnSync } from "node:child_process";
  */
 export class NodeProcessProvider implements ProcessProvider {
 
+	private constructor() { }
+	public static create(): NodeProcessProvider {
+		return new NodeProcessProvider();
+	}
+
 	/**
 	 * Locate a command using system "which".
 	 *

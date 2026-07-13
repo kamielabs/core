@@ -1,13 +1,17 @@
-import { Context } from "@contexts";
-import { BuiltinEvents, FinalEvents } from "@data";
+import { EventsManagerContext } from "@contexts";
+import { BUILTIN_EVENTS, BuiltinEvents, FinalEvents, FinalEventsChannels } from "@data";
+import { CoreEventError } from "@helpers";
 import {
 	CoreEvent,
 	CoreEventKind,
 	CoreEventKindLabel,
 	CoreEventLevel,
 	CoreEventLevelLabel,
+	CoreEventOrigin,
 	CoreEventPhase,
 	CoreEventPhaseLabel,
+	CoreEventsChannelsShape,
+	CoreEventScope,
 	CoreEventsShape,
 	CoreEventsShapeDecl,
 	CoreGlobalsShape,
@@ -22,8 +26,10 @@ import {
 	EventKeysByLevel,
 	EventListener,
 	EventOutputListener,
+	EventOutputListenerContext,
 	EventSelector,
 	LiveCoreEventsDict,
+	RuntimeAppShape,
 	RuntimeCoreEvent,
 	RuntimeCoreMessageEvent,
 	RuntimeCoreSignalEvent,
@@ -77,29 +83,32 @@ import {
  */
 export class EventsManager<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > {
 
-	private readonly _ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>;
+	private readonly _ctx: EventsManagerContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>;
 	private _events: CoreEventsShapeDecl<TEvents>;
+	private _channels: FinalEventsChannels<TChannels>;
 	private _live: LiveCoreEventsDict;
 
 	/**
 	 * Listener stores by event.name
 	 */
-	private _systemListeners: Map<string, EventOutputListener[]> = new Map();
+	private _systemListeners: Map<string, EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>[]> = new Map();
 	private _flowListeners: Map<string, EventFlowListener[]> = new Map();
-	private _runtimeListeners: Map<string, EventOutputListener[]> = new Map();
+	private _runtimeListeners: Map<string, EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>[]> = new Map();
 
 	/**
 	 * Wildcard listeners ("*")
 	 */
-	private _systemWildcardListeners: EventOutputListener[] = [];
+	private _systemWildcardListeners: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>[] = [];
 	private _flowWildcardListeners: EventFlowListener[] = [];
-	private _runtimeWildcardListeners: EventOutputListener[] = [];
+	private _runtimeWildcardListeners: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>[] = [];
 
 	/**
 	 * Initialize EventsManager
@@ -108,12 +117,14 @@ export class EventsManager<
 	 * - Initializes runtime storage and indexes
 	 * - Freezes event definitions
 	 */
-	constructor(
-		ctx: Context<TEvents, TStages, TGlobals, TModules, TTranslations>,
-		events: CoreEventsShapeDecl<TEvents>
+	private constructor(
+		ctx: EventsManagerContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>,
+		events: CoreEventsShapeDecl<TEvents>,
+		channels: FinalEventsChannels<TChannels>
 	) {
 		this._ctx = ctx;
 		this._events = events;
+		this._channels = channels;
 		this._live = {
 			list: [],
 			byId: {},
@@ -124,6 +135,22 @@ export class EventsManager<
 			}
 		} satisfies LiveCoreEventsDict;
 		this.init();
+	}
+
+	public static create<
+		TEvents extends CoreEventsShape,
+		TChannels extends CoreEventsChannelsShape,
+		TStages extends CoreStagesShape,
+		TGlobals extends CoreGlobalsShape,
+		TModules extends CoreModulesShape,
+		TTranslations extends CoreTranslationsShape,
+		TApp extends RuntimeAppShape
+	>(
+		ctx: EventsManagerContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>,
+		events: CoreEventsShapeDecl<TEvents>,
+		channels: FinalEventsChannels<TChannels>
+	): EventsManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp> {
+		return new EventsManager(ctx, events, channels);
 	}
 
 	// This init is not async because it has to be executed during constructor phase
@@ -147,6 +174,11 @@ export class EventsManager<
 	public getDict(): CoreEventsShapeDecl<TEvents> {
 		return this._events;
 	}
+
+	public getChannels(): FinalEventsChannels<TChannels> {
+		return this._channels;
+	}
+
 	public getEvents(): FinalEvents<TEvents> {
 		return this._events.list;
 	}
@@ -203,9 +235,13 @@ export class EventsManager<
 		Name extends string,
 	>(payload: CoreEvent<Name>): RuntimeCoreEvent<Name> {
 
+		const isBuiltin = Object.values(BUILTIN_EVENTS).some(
+			(evt) => payload.name === evt.name,
+		);
 		const event: RuntimeCoreEvent<Name> = {
-			id: this._ctx.providers.id.create(),
+			id: this._ctx.providers.id.generate(),
 			ts: Date.now(),
+			origin: isBuiltin ? CoreEventOrigin.core : CoreEventOrigin.app,
 			...payload
 		};
 
@@ -321,7 +357,7 @@ export class EventsManager<
 	 * The listener family is preserved through the generic parameter so flow and
 	 * passive output listeners never get mixed in internal stores.
 	 */
-	private _registerResolvedListener<T extends EventListener>(
+	private _registerResolvedListener<T extends EventListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>>(
 		store: Map<string, T[]>,
 		wildcardStore: T[],
 		name: string | null,
@@ -345,7 +381,7 @@ export class EventsManager<
 	 * The listener family is preserved through the generic parameter so removal
 	 * stays aligned with the corresponding internal store.
 	 */
-	private _offResolvedListener<T extends EventListener>(
+	private _offResolvedListener<T extends EventListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>>(
 		store: Map<string, T[]>,
 		wildcardStore: T[],
 		name: string | null,
@@ -373,16 +409,17 @@ export class EventsManager<
 	 * original listener shape, including channel binding for passive output
 	 * listeners when one exists.
 	 */
-	private _onceResolvedListener<Listener extends EventListener>(
+	private _onceResolvedListener<Listener extends EventListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>>(
 		register: (name: string | null, handler: Listener) => void,
 		off: (name: string | null, handler: Listener) => void,
 		name: string | null,
 		handler: Listener
 	) {
+		const outputListenerCtx = { translate: this._ctx.i18n.tr.bind(this._ctx.i18n) }
 		const wrapper: Listener = {
-			handler: async (event) => {
+			handler: async (event: RuntimeCoreEvent<string>) => {
 				off(name, wrapper);
-				await handler.handler(event);
+				await handler.handler(event, outputListenerCtx);
 			},
 			...(("channel" in handler && handler.channel !== undefined)
 				? { channel: handler.channel }
@@ -394,7 +431,7 @@ export class EventsManager<
 	/**
 	 * Register system listener
 	 */
-	private _registerSystemResolvedListener(name: string | null, handler: EventOutputListener) {
+	private _registerSystemResolvedListener(name: string | null, handler: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>) {
 		this._registerResolvedListener(
 			this._systemListeners,
 			this._systemWildcardListeners,
@@ -418,7 +455,7 @@ export class EventsManager<
 	/**
 	 * Register runtime listener
 	 */
-	private _registerRuntimeResolvedListener(name: string | null, handler: EventOutputListener) {
+	private _registerRuntimeResolvedListener(name: string | null, handler: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>) {
 		this._registerResolvedListener(
 			this._runtimeListeners,
 			this._runtimeWildcardListeners,
@@ -430,7 +467,7 @@ export class EventsManager<
 	/**
 	 * Remove system listener
 	 */
-	private _offSystemResolvedListener(name: string | null, handler: EventOutputListener) {
+	private _offSystemResolvedListener(name: string | null, handler: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>) {
 		this._offResolvedListener(
 			this._systemListeners,
 			this._systemWildcardListeners,
@@ -454,7 +491,7 @@ export class EventsManager<
 	/**
 	 * Remove runtime listener
 	 */
-	private _offRuntimeResolvedListener(name: string | null, handler: EventOutputListener) {
+	private _offRuntimeResolvedListener(name: string | null, handler: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>) {
 		this._offResolvedListener(
 			this._runtimeListeners,
 			this._runtimeWildcardListeners,
@@ -472,15 +509,15 @@ export class EventsManager<
 	 */
 	public registerSystemListener<K extends EventDictKey<TEvents>>(
 		key: K,
-		handler: EventOutputListener
+		handler: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
 	): void;
 	public registerSystemListener(
 		key: "*",
-		handler: EventOutputListener
+		handler: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
 	): void;
 	public registerSystemListener(
 		key: EventSelector<TEvents>,
-		handler: EventOutputListener
+		handler: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
 	): void {
 		const name = this._selectorToName(key);
 		this._registerSystemResolvedListener(name, handler);
@@ -515,15 +552,15 @@ export class EventsManager<
 	 */
 	public registerRuntimeListener<K extends EventDictKey<TEvents>>(
 		key: K,
-		handler: EventOutputListener
+		handler: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
 	): void;
 	public registerRuntimeListener(
 		key: "*",
-		handler: EventOutputListener
+		handler: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
 	): void;
 	public registerRuntimeListener(
 		key: EventSelector<TEvents>,
-		handler: EventOutputListener
+		handler: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
 	): void {
 		const name = this._selectorToName(key);
 		this._registerRuntimeResolvedListener(name, handler);
@@ -534,15 +571,15 @@ export class EventsManager<
 	 */
 	public offSystemListener<K extends EventDictKey<TEvents>>(
 		key: K,
-		handler: EventOutputListener
+		handler: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
 	): void;
 	public offSystemListener(
 		key: "*",
-		handler: EventOutputListener
+		handler: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
 	): void;
 	public offSystemListener(
 		key: EventSelector<TEvents>,
-		handler: EventOutputListener
+		handler: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
 	): void {
 		const name = this._selectorToName(key);
 		this._offSystemResolvedListener(name, handler);
@@ -572,15 +609,15 @@ export class EventsManager<
 	 */
 	public offRuntimeListener<K extends EventDictKey<TEvents>>(
 		key: K,
-		handler: EventOutputListener
+		handler: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
 	): void;
 	public offRuntimeListener(
 		key: "*",
-		handler: EventOutputListener
+		handler: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
 	): void;
 	public offRuntimeListener(
 		key: EventSelector<TEvents>,
-		handler: EventOutputListener
+		handler: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
 	): void {
 		const name = this._selectorToName(key);
 		this._offRuntimeResolvedListener(name, handler);
@@ -591,15 +628,15 @@ export class EventsManager<
 	 */
 	public onceSystemListener<K extends EventDictKey<TEvents>>(
 		key: K,
-		handler: EventOutputListener
+		handler: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
 	): void;
 	public onceSystemListener(
 		key: "*",
-		handler: EventOutputListener
+		handler: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
 	): void;
 	public onceSystemListener(
 		key: EventSelector<TEvents>,
-		handler: EventOutputListener
+		handler: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
 	): void {
 		const name = this._selectorToName(key);
 		this._onceResolvedListener(
@@ -623,11 +660,14 @@ export class EventsManager<
 	 * - overrides any system listener registered on the same channel
 	 */
 	public setOutputListener(
-		handler: (event: RuntimeCoreEvent<string>) => void | Promise<void>,
+		handler: (
+			event: RuntimeCoreEvent<string>,
+			ctx: EventOutputListenerContext<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
+		) => string | Promise<string | undefined>,
 		channel: string = "default",
 		eventKeys?: EventSelector<TEvents>[] | "*"
 	) {
-		const listener: EventOutputListener = {
+		const listener: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp> = {
 			handler,
 			channel
 		};
@@ -635,7 +675,7 @@ export class EventsManager<
 		const keys = eventKeys && eventKeys.length > 0 ? eventKeys : ["*"];
 
 		for (const key of keys) {
-			this._ctx.events.registerRuntimeListener(key as any, listener);
+			this.registerRuntimeListener(key as any, listener);
 		}
 	}
 
@@ -668,15 +708,15 @@ export class EventsManager<
 	 */
 	public onceRuntimeListener<K extends EventDictKey<TEvents>>(
 		key: K,
-		handler: EventOutputListener
+		handler: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
 	): void;
 	public onceRuntimeListener(
 		key: "*",
-		handler: EventOutputListener
+		handler: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
 	): void;
 	public onceRuntimeListener(
 		key: EventSelector<TEvents>,
-		handler: EventOutputListener
+		handler: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
 	): void {
 		const name = this._selectorToName(key);
 		this._onceResolvedListener(
@@ -697,7 +737,7 @@ export class EventsManager<
 	 * The listener family is preserved through the generic parameter so callers
 	 * receive either flow listeners or passive output listeners, never a mixed set.
 	 */
-	private _getHandlersForEvent<Listener extends EventListener>(
+	private _getHandlersForEvent<Listener extends EventListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>>(
 		runtimeEvent: RuntimeCoreEvent<string>,
 		store: Map<string, Listener[]>,
 		wildcardStore: Listener[]
@@ -715,55 +755,145 @@ export class EventsManager<
 	 * - Flow listeners are excluded from this passive dispatch path
 	 */
 	private async _dispatchWithChannels(
-		runtimeEvent: RuntimeCoreEvent<string>
+		runtimeEvent: RuntimeCoreEvent<string>,
 	) {
 		const systemHandlers = this._getHandlersForEvent(
 			runtimeEvent,
 			this._systemListeners,
-			this._systemWildcardListeners
+			this._systemWildcardListeners,
 		);
 
 		const runtimeHandlers = this._getHandlersForEvent(
 			runtimeEvent,
 			this._runtimeListeners,
-			this._runtimeWildcardListeners
+			this._runtimeWildcardListeners,
 		);
 
-		const systemByChannel = new Map<string, EventOutputListener[]>();
-		const runtimeByChannel = new Map<string, EventOutputListener[]>();
+		const systemByChannel = new Map<
+			keyof FinalEventsChannels<TChannels> & string,
+			EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>[]
+		>();
 
-		const group = (handlers: EventOutputListener[], target: Map<string, EventOutputListener[]>) => {
-			for (const h of handlers) {
-				const channel = h.channel ?? "default";
-				if (!target.has(channel)) target.set(channel, []);
-				target.get(channel)!.push(h);
+		const runtimeByChannel = new Map<
+			keyof FinalEventsChannels<TChannels> & string,
+			EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>[]
+		>();
+
+		const group = (
+			handlers: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>[],
+			target: typeof systemByChannel,
+		) => {
+			for (const listener of handlers) {
+				const channel = listener.channel ?? "default";
+
+				if (!target.has(channel)) {
+					target.set(channel, []);
+				}
+
+				target.get(channel)!.push(listener);
 			}
 		};
 
 		group(systemHandlers, systemByChannel);
 		group(runtimeHandlers, runtimeByChannel);
 
-		const channels = new Set([
-			...systemByChannel.keys(),
-			...runtimeByChannel.keys()
-		]);
+		const outputListenerCtx = {
+			translate: this._ctx.i18n.tr.bind(this._ctx.i18n),
+		};
 
-		for (const channel of channels) {
-			const runtime = runtimeByChannel.get(channel);
-			if (runtime && runtime.length > 0) {
-				for (const h of runtime) {
-					await h.handler(runtimeEvent);
+		for (const channel of Object.keys(this._channels) as Array<
+			keyof FinalEventsChannels<TChannels> & string
+		>) {
+
+			const listeners =
+				runtimeByChannel.get(channel) ??
+				systemByChannel.get(channel);
+
+			if (!listeners?.length) {
+				continue;
+			}
+
+			for (const listener of listeners) {
+
+				const minLevel =
+					listener.level ?? CoreEventLevel.trace;
+
+				const scope =
+					listener.scope ?? CoreEventScope.app;
+
+				if (runtimeEvent.level < minLevel) {
+					continue;
 				}
-			} else {
-				const system = systemByChannel.get(channel);
-				if (system) {
-					for (const h of system) {
-						await h.handler(runtimeEvent);
-					}
+
+				if (runtimeEvent.scope < scope) {
+					continue;
 				}
+
+				const output = await listener.handler(
+					runtimeEvent,
+					outputListenerCtx,
+				);
+
+				this._printRuntimeEvent(runtimeEvent, output);
 			}
 		}
 	}
+	// private async _dispatchWithChannels(
+	// 	runtimeEvent: RuntimeCoreEvent<string>
+	// ) {
+	// 	const systemHandlers = this._getHandlersForEvent(
+	// 		runtimeEvent,
+	// 		this._systemListeners,
+	// 		this._systemWildcardListeners
+	// 	);
+	//
+	// 	const runtimeHandlers = this._getHandlersForEvent(
+	// 		runtimeEvent,
+	// 		this._runtimeListeners,
+	// 		this._runtimeWildcardListeners
+	// 	);
+	//
+	// 	const systemByChannel = new Map<string, EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>[]>();
+	// 	const runtimeByChannel = new Map<string, EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>[]>();
+	//
+	// 	const group = (
+	// 		handlers: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>[],
+	// 		target: Map<string, EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>[]>
+	// 	) => {
+	// 		for (const h of handlers) {
+	// 			const channel = h.channel ?? "default";
+	// 			if (!target.has(channel)) target.set(channel, []);
+	// 			target.get(channel)!.push(h);
+	// 		}
+	// 	};
+	//
+	// 	group(systemHandlers, systemByChannel);
+	// 	group(runtimeHandlers, runtimeByChannel);
+	//
+	// 	const channels = new Set([
+	// 		...systemByChannel.keys(),
+	// 		...runtimeByChannel.keys()
+	// 	]);
+	//
+	// 	const outputListenerCtx = { translate: this._ctx.i18n.tr.bind(this._ctx.i18n) };
+	// 	for (const channel of channels) {
+	// 		const runtime = runtimeByChannel.get(channel);
+	// 		if (runtime && runtime.length > 0) {
+	// 			for (const h of runtime) {
+	// 				const output = await h.handler(runtimeEvent, outputListenerCtx);
+	// 				this._printRuntimeEvent(runtimeEvent, output)
+	// 			}
+	// 		} else {
+	// 			const system = systemByChannel.get(channel);
+	// 			if (system) {
+	// 				for (const h of system) {
+	// 					const output = await h.handler(runtimeEvent, outputListenerCtx);
+	// 					this._printRuntimeEvent(runtimeEvent, output)
+	// 				}
+	// 			}
+	// 		}
+	// 	}
+	// }
 
 	/**
 	 * Simple dispatch (no channel logic)
@@ -786,13 +916,34 @@ export class EventsManager<
 		}
 	}
 
-	/**
-	 * Handle terminal events
-	 *
-	 * `error` / `fatal` terminate the process immediately after dispatch.
-	 */
-	private _handleTerminalEvent(): never {
-		process.exit(1);
+	private _printRuntimeEvent(
+		event: RuntimeCoreEvent<string>,
+		output?: string
+	): void | never {
+		switch (event.level) {
+			case CoreEventLevel.trace:
+			case CoreEventLevel.debug:
+				if (output !== undefined) {
+					console.debug(output);
+				}
+				return;
+
+			case CoreEventLevel.info:
+				if (output !== undefined) {
+					console.info(output);
+				}
+				return;
+
+			case CoreEventLevel.warning:
+				if (output !== undefined) {
+					console.warn(output);
+				}
+				return;
+
+			case CoreEventLevel.error:
+			case CoreEventLevel.fatal:
+				throw new CoreEventError(output ?? "", 1);
+		}
 	}
 
 	/**
@@ -819,10 +970,6 @@ export class EventsManager<
 			details: [`Unknown key: ${key as string}`]
 		});
 
-		const isTerminal =
-			evt.level === CoreEventLevel.error ||
-			evt.level === CoreEventLevel.fatal;
-
 		const runtimeEvent = this._createEvent(evt);
 
 		if (evt.kind === CoreEventKind.signal) {
@@ -839,7 +986,7 @@ export class EventsManager<
 
 		await this._dispatchWithChannels(runtimeEvent);
 
-		if (this._ctx.settings.engine === "fed" && evt.trigger === true && !isTerminal) {
+		if (this._ctx.settings.engine === "fed" && evt.trigger === true) {
 			await this._dispatchListeners(
 				runtimeEvent,
 				this._flowListeners,
@@ -847,13 +994,7 @@ export class EventsManager<
 			);
 		}
 
-		if (isTerminal) {
-			this._handleTerminalEvent();
-
-		} else {
-
-			return runtimeEvent;
-		}
+		return runtimeEvent;
 
 	}
 

@@ -8,14 +8,37 @@
 // - Any change in EventsManager signatures MUST be reflected here
 
 import {
+	CLISettings,
+	CoreEventsChannelsShape,
 	CoreEventsShape,
 	CoreGlobalsShape,
 	CoreModulesShape,
 	CoreStagesShape,
-	CoreTranslationsShape
+	CoreTranslationsShape,
+	RuntimeAppShape,
 } from "@types"
 
-import { EventsManager } from "@managers"
+import { EventsManager, I18nManager } from "@managers"
+import { CoreProviders } from "@providers";
+import { CoreHelpers } from "@helpers";
+
+
+export type EventsManagerContext<
+	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
+	TStages extends CoreStagesShape,
+	TGlobals extends CoreGlobalsShape,
+	TModules extends CoreModulesShape,
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
+> = {
+	settings: CLISettings;
+	providers: CoreProviders,
+	helpers: {
+		core: CoreHelpers
+	},
+	i18n: { tr: I18nManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>["tr"] }
+}
 
 /**
  * SignalTraceHookMethod
@@ -32,12 +55,14 @@ import { EventsManager } from "@managers"
  */
 export type SignalTraceHookMethod<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > =
-	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['signalTrace'];
+	EventsManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>['signalTrace'];
 
 /**
  * SignalDebugHookMethod
@@ -54,12 +79,14 @@ export type SignalTraceHookMethod<
  */
 export type SignalDebugHookMethod<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > =
-	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['signalDebug'];
+	EventsManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>['signalDebug'];
 
 /**
  * SignalInfoHookMethod
@@ -76,12 +103,14 @@ export type SignalDebugHookMethod<
  */
 export type SignalInfoHookMethod<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > =
-	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['signalInfo'];
+	EventsManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>['signalInfo'];
 
 /**
  * SignalWarnHookMethod
@@ -98,12 +127,14 @@ export type SignalInfoHookMethod<
  */
 export type SignalWarnHookMethod<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > =
-	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['signalWarn'];
+	EventsManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>['signalWarn'];
 
 /**
  * SignalThrowHookMethod
@@ -120,12 +151,14 @@ export type SignalWarnHookMethod<
  */
 export type SignalThrowHookMethod<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > =
-	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['signalThrow'];
+	EventsManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>['signalThrow'];
 
 /**
  * MessageTraceHookMethod
@@ -142,12 +175,14 @@ export type SignalThrowHookMethod<
  */
 export type MessageTraceHookMethod<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > =
-	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['messageTrace'];
+	EventsManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>['messageTrace'];
 
 /**
  * MessageDebugHookMethod
@@ -164,12 +199,14 @@ export type MessageTraceHookMethod<
  */
 export type MessageDebugHookMethod<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > =
-	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['messageDebug'];
+	EventsManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>['messageDebug'];
 
 /**
  * MessageInfoHookMethod
@@ -186,12 +223,14 @@ export type MessageDebugHookMethod<
  */
 export type MessageInfoHookMethod<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > =
-	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['messageInfo'];
+	EventsManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>['messageInfo'];
 
 /**
  * MessageWarnHookMethod
@@ -208,12 +247,14 @@ export type MessageInfoHookMethod<
  */
 export type MessageWarnHookMethod<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > =
-	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['messageWarn'];
+	EventsManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>['messageWarn'];
 
 /**
  * MessageThrowHookMethod
@@ -230,12 +271,14 @@ export type MessageWarnHookMethod<
  */
 export type MessageThrowHookMethod<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > =
-	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['messageThrow'];
+	EventsManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>['messageThrow'];
 /**
  * SetOutputListenerMethod
  *
@@ -256,20 +299,25 @@ export type MessageThrowHookMethod<
  */
 export type SetOutputListenerMethod<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > =
-	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['setOutputListener'];
+	EventsManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>['setOutputListener'];
 
 
 
 export type GetFilteredEventsMethod<
 	TEvents extends CoreEventsShape,
+	TChannels extends CoreEventsChannelsShape,
 	TStages extends CoreStagesShape,
 	TGlobals extends CoreGlobalsShape,
 	TModules extends CoreModulesShape,
-	TTranslations extends CoreTranslationsShape
+	TTranslations extends CoreTranslationsShape,
+	TApp extends RuntimeAppShape
 > =
-	EventsManager<TEvents, TStages, TGlobals, TModules, TTranslations>['getFilteredEvents'];
+	EventsManager<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>['getFilteredEvents'];
+
