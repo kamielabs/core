@@ -8,8 +8,10 @@ import {
 	CoreEventLevel,
 	CoreEventLevelLabel,
 	CoreEventOrigin,
+	CoreEventOriginLabel,
 	CoreEventPhase,
 	CoreEventPhaseLabel,
+	CoreEventReplayPolicyLabel,
 	CoreEventsChannelsShape,
 	CoreEventScope,
 	CoreEventScopeLabel,
@@ -34,6 +36,7 @@ import {
 	RuntimeCoreEvent,
 	RuntimeCoreMessageEvent,
 	RuntimeCoreSignalEvent,
+	RuntimeEventFilters,
 	TerminalEventKeys,
 	TerminalMessageKeys,
 	TerminalSignalKeys,
@@ -132,7 +135,9 @@ export class EventsManager<
 			index: {
 				byKind: {},
 				byLevel: {},
-				byPhase: {}
+				byPhase: {},
+				byOrigin: {},
+				byScope: {}
 			}
 		} satisfies LiveCoreEventsDict;
 		this.init();
@@ -184,6 +189,10 @@ export class EventsManager<
 		return this._events.list;
 	}
 
+	private _getLive(): LiveCoreEventsDict {
+		return this._live;
+	}
+
 	public getLive(): Readonly<LiveCoreEventsDict> {
 		const live = this._ctx.helpers.core.deepClone(this._live);
 		this._ctx.helpers.core.deepFreeze(live);
@@ -200,12 +209,14 @@ export class EventsManager<
 		this._push(state.index.byKind, event.kind, event);
 		this._push(state.index.byPhase, event.phase, event);
 		this._push(state.index.byLevel, event.level, event);
+		this._push(state.index.byOrigin, event.origin, event);
+		this._push(state.index.byScope, event.scope, event);
 	}
 
 	/**
 	 * Push event ID into index bucket
 	 */
-	private _push<K extends CoreEventKind | CoreEventLevel | CoreEventPhase, Name extends string>(
+	private _push<K extends CoreEventKind | CoreEventLevel | CoreEventPhase | CoreEventOrigin | CoreEventScope, Name extends string>(
 		map: Partial<Record<K, string[]>>,
 		key: K,
 		event: RuntimeCoreEvent<Name>
@@ -218,7 +229,7 @@ export class EventsManager<
 	 * Resolve event IDs into runtime events
 	 */
 	private _resolveIds(ids: string[]): RuntimeCoreEvent<string>[] {
-		const byId = this.getLive().byId;
+		const byId = this._getLive().byId;
 		const out: RuntimeCoreEvent<string>[] = [];
 
 		for (const id of ids) {
@@ -240,10 +251,11 @@ export class EventsManager<
 			(evt) => payload.name === evt.name,
 		);
 		const event: RuntimeCoreEvent<Name> = {
+			...payload,
 			id: this._ctx.providers.id.generate(),
-			ts: Date.now(),
+			ts: this._ctx.providers.datetime.now(),
+			dispatched: {},
 			origin: isBuiltin ? CoreEventOrigin.core : CoreEventOrigin.app,
-			...payload
 		};
 
 		this._live.list.push(event);
@@ -257,21 +269,35 @@ export class EventsManager<
 	 * Get event IDs by kind
 	 */
 	private _getIdsByKind(kind: CoreEventKind): string[] {
-		return this.getLive().index.byKind[kind] ?? [];
+		return this._getLive().index.byKind[kind] ?? [];
 	}
 
 	/**
 	 * Get event IDs by phase
 	 */
 	private _getIdsByPhase(phase: CoreEventPhase): string[] {
-		return this.getLive().index.byPhase[phase] ?? [];
+		return this._getLive().index.byPhase[phase] ?? [];
 	}
 
 	/**
 	 * Get event IDs by level
 	 */
 	private _getIdsByLevel(level: CoreEventLevel): string[] {
-		return this.getLive().index.byLevel[level] ?? [];
+		return this._getLive().index.byLevel[level] ?? [];
+	}
+
+	/**
+	 * Get event IDs by scope
+	 */
+	private _getIdsByScope(scope: CoreEventScope): string[] {
+		return this._getLive().index.byScope[scope] ?? [];
+	}
+
+	/**
+	 * Get event IDs by origin
+	 */
+	private _getIdsByOrigin(origin: CoreEventOrigin): string[] {
+		return this._getLive().index.byOrigin[origin] ?? [];
 	}
 
 	private _intersectIds(current: string[] | null, next: string[]): string[] {
@@ -286,53 +312,99 @@ export class EventsManager<
 		});
 	}
 
-	public getFilteredEvents({
-		kind = null,
-		phase = null,
-		level = null,
-		nameContains = null
-	}: {
-		kind?: keyof typeof CoreEventKindLabel | null;
-		phase?: keyof typeof CoreEventPhaseLabel | null;
-		level?: keyof typeof CoreEventLevelLabel | null;
-		nameContains?: string | null;
-	} = {}): RuntimeCoreEvent<string>[] {
-
+	public getFilteredEvents(
+		{
+			kind = null,
+			phase = null,
+			level = null,
+			minLevel = null,
+			scope = null,
+			minScope = null,
+			origin = null,
+			nameContains = null,
+			channel,
+			dispatched = null,
+		}: RuntimeEventFilters<TChannels> = {},
+	): RuntimeCoreEvent<string>[] {
 		let ids: string[] | null = null;
 
-		const kindKey = kind ? CoreEventKindLabel[kind] : null;
-		const phaseKey = phase ? CoreEventPhaseLabel[phase] : null;
-		const levelKey = level ? CoreEventLevelLabel[level] : null;
+		const kindKey = kind !== null ? CoreEventKindLabel[kind] : null;
+		const phaseKey = phase !== null ? CoreEventPhaseLabel[phase] : null;
+		const levelKey = level !== null ? CoreEventLevelLabel[level] : null;
+		const scopeKey = scope !== null ? CoreEventScopeLabel[scope] : null;
+		const originKey = origin !== null ? CoreEventOriginLabel[origin] : null;
 
-		// Filter by kind
 		if (kindKey !== null) {
 			ids = this._intersectIds(
 				ids,
-				this._getIdsByKind(kindKey)
+				this._getIdsByKind(kindKey),
 			);
 		}
 
 		if (phaseKey !== null) {
 			ids = this._intersectIds(
 				ids,
-				this._getIdsByPhase(phaseKey)
+				this._getIdsByPhase(phaseKey),
 			);
 		}
 
 		if (levelKey !== null) {
 			ids = this._intersectIds(
 				ids,
-				this._getIdsByLevel(levelKey)
+				this._getIdsByLevel(levelKey),
 			);
 		}
 
-		let events = ids === null
-			? [...this.getLive().list]
-			: this._resolveIds(ids);
+		if (scopeKey !== null) {
+			ids = this._intersectIds(
+				ids,
+				this._getIdsByScope(scopeKey),
+			);
+		}
+
+		if (originKey !== null) {
+			ids = this._intersectIds(
+				ids,
+				this._getIdsByOrigin(originKey),
+			);
+		}
+
+		let events =
+			ids === null
+				? [...this._getLive().list]
+				: this._resolveIds(ids);
+
+		if (minLevel !== null) {
+			const minimum = CoreEventLevelLabel[minLevel];
+
+			events = events.filter(
+				(event) => event.level >= minimum,
+			);
+		}
+
+		if (minScope !== null) {
+			const minimum = CoreEventScopeLabel[minScope];
+
+			events = events.filter(
+				(event) => event.scope >= minimum,
+			);
+		}
 
 		if (nameContains !== null) {
+			events = events.filter(
+				(event) => event.name.includes(nameContains),
+			);
+		}
+
+		if (
+			channel !== undefined &&
+			dispatched !== null
+		) {
 			events = events.filter((event) => {
-				return event.name.includes(nameContains);
+				const wasDispatched =
+					event.dispatched[channel as string] === true;
+
+				return wasDispatched === dispatched;
 			});
 		}
 
@@ -660,7 +732,7 @@ export class EventsManager<
 	 * - channel = "default"
 	 * - overrides any system listener registered on the same channel
 	 */
-	public setOutputListener(
+	public async setOutputListener(
 		handler: (
 			event: RuntimeCoreEvent<string>,
 			ctx: EventOutputListenerContext<
@@ -671,30 +743,95 @@ export class EventsManager<
 				TModules,
 				TTranslations,
 				TApp
-			>
-		) => string | Promise<string | undefined>,
+			>,
+		) => string | undefined | Promise<string | undefined>,
 		options?: {
 			channel?: keyof FinalEventsChannels<TChannels> & string;
 			level?: keyof typeof CoreEventLevelLabel;
 			scope?: keyof typeof CoreEventScopeLabel;
 			events?: EventSelector<TEvents>[] | "*";
+			replayPastEvents?: keyof typeof CoreEventReplayPolicyLabel;
+		},
+	): Promise<void> {
+		const listener: EventOutputListener<
+			TEvents,
+			TChannels,
+			TStages,
+			TGlobals,
+			TModules,
+			TTranslations,
+			TApp
+		> = {
+			handler,
+		};
+
+		if (options?.channel) {
+			listener.channel = options.channel;
 		}
-	) {
-		const listener: EventOutputListener<TEvents, TChannels, TStages, TGlobals, TModules, TTranslations, TApp>
-			= { handler };
 
-		if (options?.channel) listener.channel = options.channel;
-		if (options?.level) listener.level = CoreEventLevelLabel[options.level];
-		if (options?.scope) listener.scope = CoreEventScopeLabel[options.scope];
+		if (options?.level) {
+			listener.level =
+				CoreEventLevelLabel[options.level];
+		}
 
+		if (options?.scope) {
+			listener.scope =
+				CoreEventScopeLabel[options.scope];
+		}
 
 		const keys =
-			options?.events && options.events.length > 0
+			options?.events &&
+				options.events.length > 0
 				? options.events
 				: ["*"];
 
 		for (const key of keys) {
-			this.registerRuntimeListener(key as any, listener);
+			this.registerRuntimeListener(
+				key as any,
+				listener,
+			);
+		}
+
+		const replay =
+			options?.replayPastEvents ?? "none";
+
+		if (replay === "none") {
+			return;
+		}
+
+		const channel =
+			listener.channel ?? "default";
+
+		const outputListenerCtx = {
+			translate:
+				this._ctx.i18n.tr.bind(
+					this._ctx.i18n,
+				),
+		};
+
+		const historicalEvents =
+			this.getFilteredEvents(
+				{
+					level: options?.level ?? null,
+					scope: options?.scope ?? null,
+					channel:
+						replay === "missing"
+							? channel
+							: null,
+					dispatched:
+						replay === "missing"
+							? false
+							: null,
+				});
+
+
+		for (const runtimeEvent of historicalEvents) {
+			await this._dispatchOutputListener(
+				runtimeEvent,
+				listener,
+				channel,
+				outputListenerCtx,
+			);
 		}
 	}
 
@@ -765,6 +902,53 @@ export class EventsManager<
 		return [...handlers, ...wildcardStore];
 	}
 
+	private async _dispatchOutputListener(
+		runtimeEvent: RuntimeCoreEvent<string>,
+		listener: EventOutputListener<
+			TEvents,
+			TChannels,
+			TStages,
+			TGlobals,
+			TModules,
+			TTranslations,
+			TApp
+		>,
+		channel: keyof FinalEventsChannels<TChannels> & string,
+		outputListenerCtx: EventOutputListenerContext<
+			TEvents,
+			TChannels,
+			TStages,
+			TGlobals,
+			TModules,
+			TTranslations,
+			TApp
+		>,
+	): Promise<void> {
+		const minLevel =
+			listener.level ?? CoreEventLevel.trace;
+
+		const minScope =
+			listener.scope ?? CoreEventScope.app;
+
+		if (runtimeEvent.level < minLevel) {
+			return;
+		}
+
+		if (runtimeEvent.scope < minScope) {
+			return;
+		}
+
+		const output = await listener.handler(
+			runtimeEvent,
+			outputListenerCtx,
+		);
+
+		this._printRuntimeEvent(
+			runtimeEvent,
+			output,
+			channel,
+		);
+	}
 	/**
 	 * Dispatch event with channel priority
 	 *
@@ -833,27 +1017,12 @@ export class EventsManager<
 			}
 
 			for (const listener of listeners) {
-
-				const minLevel =
-					listener.level ?? CoreEventLevel.trace;
-
-				const scope =
-					listener.scope ?? CoreEventScope.app;
-
-				if (runtimeEvent.level < minLevel) {
-					continue;
-				}
-
-				if (runtimeEvent.scope < scope) {
-					continue;
-				}
-
-				const output = await listener.handler(
+				await this._dispatchOutputListener(
 					runtimeEvent,
+					listener,
+					channel,
 					outputListenerCtx,
 				);
-
-				this._printRuntimeEvent(runtimeEvent, output);
 			}
 		}
 	}
@@ -881,25 +1050,29 @@ export class EventsManager<
 
 	private _printRuntimeEvent(
 		event: RuntimeCoreEvent<string>,
-		output?: string
+		output: string | undefined,
+		channel: keyof FinalEventsChannels<TChannels> & string,
 	): void | never {
 		switch (event.level) {
 			case CoreEventLevel.trace:
 			case CoreEventLevel.debug:
 				if (output !== undefined) {
 					console.debug(output);
+					event.dispatched[channel] = true;
 				}
 				return;
 
 			case CoreEventLevel.info:
 				if (output !== undefined) {
 					console.info(output);
+					event.dispatched[channel] = true;
 				}
 				return;
 
 			case CoreEventLevel.warning:
 				if (output !== undefined) {
 					console.warn(output);
+					event.dispatched[channel] = true;
 				}
 				return;
 
