@@ -52,11 +52,18 @@ export enum CoreEventOrigin {
 	app
 }
 
+export enum CoreEventReplayPolicy {
+	none,
+	missing,
+	full
+}
+
 export type EventKindRecords = Record<string, CoreEventKind>;
 export type EventPhaseRecords = Record<string, CoreEventPhase>;
 export type EventLevelRecords = Record<string, CoreEventLevel>;
 export type EventScopeRecords = Record<string, CoreEventScope>;
 export type EventOriginRecords = Record<string, CoreEventOrigin>;
+export type EventReplayPolicyRecords = Record<string, CoreEventReplayPolicy>;
 
 /**
  * String-to-enum lookup for event kinds.
@@ -102,6 +109,12 @@ export const CoreEventOriginLabel = {
 	core: CoreEventOrigin.core,
 	app: CoreEventOrigin.app
 } as const satisfies EventOriginRecords;
+
+export const CoreEventReplayPolicyLabel = {
+	none: CoreEventReplayPolicy.none,
+	missing: CoreEventReplayPolicy.missing,
+	full: CoreEventReplayPolicy.full
+} as const satisfies EventReplayPolicyRecords;
 
 /* -------------------------------------------------------------------------- */
 /* Declarative events                                                         */
@@ -190,6 +203,7 @@ export type RuntimeCoreSignalEvent<
 	id: string;
 	ts: number;
 	origin: CoreEventOrigin;
+	dispatched: Partial<Record<string, true>>;
 	details?: string[];
 	values?: never;
 };
@@ -205,6 +219,7 @@ export type RuntimeCoreMessageEvent<
 	id: string;
 	ts: number;
 	origin: CoreEventOrigin;
+	dispatched: Partial<Record<string, true>>;
 	values?: Record<string, string>;
 	details?: never;
 };
@@ -233,9 +248,43 @@ export type LiveCoreEventsDict = {
 		byKind: Partial<Record<CoreEventKind, string[]>>;
 		byPhase: Partial<Record<CoreEventPhase, string[]>>;
 		byLevel: Partial<Record<CoreEventLevel, string[]>>;
+		byScope: Partial<Record<CoreEventScope, string[]>>;
+		byOrigin: Partial<Record<CoreEventOrigin, string[]>>;
 	};
 };
 
+export type RuntimeEventFilters<
+	TChannels extends CoreEventsChannelsShape
+> = {
+	kind?: keyof typeof CoreEventKindLabel | null;
+	phase?: keyof typeof CoreEventPhaseLabel | null;
+
+	/**
+	 * Exact level match.
+	 */
+	level?: keyof typeof CoreEventLevelLabel | null;
+
+	/**
+	 * Minimum accepted level.
+	 */
+	minLevel?: keyof typeof CoreEventLevelLabel | null;
+
+	/**
+	 * Exact scope match.
+	 */
+	scope?: keyof typeof CoreEventScopeLabel | null;
+
+	/**
+	 * Minimum accepted scope.
+	 */
+	minScope?: keyof typeof CoreEventScopeLabel | null;
+
+	origin?: keyof typeof CoreEventOriginLabel | null;
+	nameContains?: string | null;
+
+	channel?: keyof FinalEventsChannels<TChannels> & string | null;
+	dispatched?: boolean | null;
+};
 /* -------------------------------------------------------------------------- */
 /* Key extraction helpers                                                     */
 /* -------------------------------------------------------------------------- */
@@ -442,6 +491,12 @@ export type EventOutputListener<
 	scope?: CoreEventScope;
 };
 
+export type EventOutputResult =
+	| string
+	| undefined
+	| {
+		dispatched: true;
+	};
 /**
  * Any listener accepted by the core event system.
  *
